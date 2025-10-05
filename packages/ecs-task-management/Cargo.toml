@@ -1,0 +1,30 @@
+[package]
+name = "ecs-task-management"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+description = "Enterprise-grade async task management with Bevy ECS integration"
+
+[dependencies]
+bevy = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+thiserror = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
+paste = "1.0"
+
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"
+
+[dev-dependencies]
+tokio-test = "0.4"

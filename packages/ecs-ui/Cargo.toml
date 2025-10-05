@@ -1,0 +1,42 @@
+[package]
+name = "action-items_ecs-ui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+
+[dependencies]
+bevy = { workspace = true }
+bevy_rich_text3d = { version = "0.4", optional = true }
+radsort = "0.1"
+rand = { version = "0.9", optional = true }
+getrandom = { version = "0.3", optional = true }
+colored = "3"
+thiserror = "2"
+tracing.workspace = true
+accesskit = "0.21"
+objc2 = "0.6.2"
+objc2-app-kit = "0.3.1"
+objc2-foundation = "0.3.1"
+metrics = "0.24.2"
+
+[features]
+default = ["text3d"]
+text3d = ["dep:bevy_rich_text3d"]
+animations = ["dep:rand", "dep:getrandom"]
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_UI_Accessibility",
+    "Win32_UI_WindowsAndMessaging",
+] }

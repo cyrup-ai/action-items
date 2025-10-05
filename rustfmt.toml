@@ -1,0 +1,92 @@
+# Project metadata
+edition = "2024"
+style_edition = "2024"
+
+# Line width and formatting
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Unix"
+
+# Import organization (based on Winit's proven approach)
+group_imports = "StdExternalCrate"
+imports_granularity = "Module"
+imports_indent = "Block"
+imports_layout = "Mixed"
+reorder_imports = true
+reorder_modules = true
+
+# Code structure
+use_small_heuristics = "Max"
+fn_call_width = 60
+attr_fn_like_width = 70
+struct_lit_width = 18
+struct_variant_width = 35
+array_width = 60
+chain_width = 60
+single_line_if_else_max_width = 50
+
+# Comments and documentation (following Bevy's conservative approach)
+wrap_comments = true
+comment_width = 100
+format_code_in_doc_comments = true
+normalize_comments = true
+normalize_doc_attributes = true
+
+# String and macro formatting
+format_strings = true
+format_macro_matchers = true
+format_macro_bodies = true
+
+# Structure formatting
+empty_item_single_line = true
+struct_lit_single_line = true
+fn_single_line = false
+where_single_line = false
+use_field_init_shorthand = true
+
+# Expression formatting
+type_punctuation_density = "Wide"
+space_before_colon = false
+space_after_colon = true
+spaces_around_ranges = false
+binop_separator = "Front"
+remove_nested_parens = true
+combine_control_expr = true
+overflow_delimited_expr = true
+condense_wildcard_suffixes = true
+
+# Block and brace style
+struct_field_align_threshold = 0
+enum_discrim_align_threshold = 0
+match_arm_blocks = true
+force_multiline_blocks = false
+fn_params_layout = "Tall"
+brace_style = "SameLineWhere"
+control_brace_style = "AlwaysSameLine"
+match_block_trailing_comma = true
+
+# Trailing elements
+trailing_semicolon = true
+trailing_comma = "Vertical"
+
+# Blank lines
+blank_lines_upper_bound = 1
+blank_lines_lower_bound = 0
+
+# Advanced options
+merge_derives = true
+use_try_shorthand = false
+force_explicit_abi = true
+hex_literal_case = "Lower"
+
+# Quality enforcement (from official rustfmt)
+error_on_line_overflow = false
+error_on_unformatted = false
+show_parse_errors = true
+
+# Output configuration
+color = "Auto"
+emit_mode = "Files"
+make_backup = false
+ignore = []

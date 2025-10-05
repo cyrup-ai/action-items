@@ -1,0 +1,36 @@
+[package]
+name = "ecs-launcher"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+description = "ECS launcher service providing action item execution, search, and UI management"
+license = "MIT"
+
+[dependencies]
+bevy = { workspace = true }
+ecs-hotkey = { path = "../ecs-hotkey" }
+ecs-task-management = { path = "../ecs-task-management" }
+ecs-service-bridge = { path = "../ecs-service-bridge" }
+action_items_ecs_search_aggregator = { path = "../ecs-search-aggregator" }
+action_items_core = { path = "../core" }
+global-hotkey = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing = "0.1"
+thiserror = "2"
+dirs = "6"
+rustc-hash = "2"
+tokio = { version = "1", features = ["rt", "macros", "time"] }
+
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"

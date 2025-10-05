@@ -1,0 +1,55 @@
+[package]
+name = "action_items_ui"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+bevy = { workspace = true }
+action_items_core = { path = "../core" }
+action-items_ecs-ui = { path = "../ecs-ui" }
+action_items_ecs_settings = { path = "../ecs-settings" }
+
+accesskit = "0.21"
+tracing = "0.1.41"
+objc2 = "0.6.2"
+objc2-app-kit = "0.3.1"
+objc2-foundation = "0.3.1"
+tokio.workspace = true
+metrics = "0.24.2"
+crossbeam-channel.workspace = true
+
+[lib]
+name = "action_items_ui"
+path = "src/lib.rs"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+
+
+
+[target.'cfg(target_os = "windows")'.dependencies]
+
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"
+
+[dev-dependencies]
+arbitrary = "1.4.2"
+assert_matches = "1.5.0"
+fake = "4.4.0"
+futures-test = "0.3.31"
+insta = "1.43.1"
+proptest = "1.7.0"
+quickcheck = "1.0.3"
+serde_test = "1.0.177"
+serial_test = "3.2.0"
+tempfile = "3.21.0"
+tokio-test = "0.4.4"

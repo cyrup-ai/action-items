@@ -1,0 +1,21 @@
+[package]
+name = "action_items_ecs_search"
+version = { workspace = true }
+edition = { workspace = true }
+description = "ECS search service with scoring and filtering"
+
+[dependencies]
+bevy = { workspace = true }
+action_items_core = { path = "../core" }
+action_items_ecs_cache = { path = "../ecs-cache" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
+futures-lite = "2.3"
+action-items_ecs-ui = { path = "../ecs-ui" }
+
+[lib]
+name = "action_items_ecs_search"
+path = "src/lib.rs"

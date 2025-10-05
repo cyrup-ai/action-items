@@ -1,0 +1,27 @@
+[package]
+name = "action_items_ecs_native_menu"
+version = { workspace = true }
+edition = { workspace = true }
+description = "Cross-platform native menu system for Bevy ECS"
+
+[dependencies]
+bevy = { workspace = true }
+muda = "0.14"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+raw-window-handle = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Foundation"
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+[lib]
+name = "action_items_ecs_native_menu"
+path = "src/lib.rs"

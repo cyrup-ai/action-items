@@ -1,0 +1,30 @@
+[package]
+name = "action_items_ecs_compression"
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[dependencies]
+bevy.workspace = true
+crossbeam-queue = "0.3"
+crossbeam-utils = "0.8.21"
+lz4_flex = "0.11"
+brotli = "7.0.0"  # Pure Rust implementation
+snap = "1.1.1"    # Pure Rust Snappy implementation
+zstd = "0.13.3"   # Zstd compression library
+flate2 = "1.1.2"  # DEFLATE compression and decompression
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

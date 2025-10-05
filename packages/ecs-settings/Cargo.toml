@@ -1,0 +1,19 @@
+[package]
+name = "action_items_ecs_settings"
+version = { workspace = true }
+edition = { workspace = true }
+description = "ECS settings management service"
+
+[dependencies]
+action-items_ecs-ui = { path = "../ecs-ui" }
+action_items_ecs_user_settings = { path = "../ecs-user-settings" }
+ecs-service-bridge = { path = "../ecs-service-bridge" }
+bevy = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[lib]
+name = "action_items_ecs_settings"
+path = "src/lib.rs"

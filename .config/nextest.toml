@@ -1,0 +1,70 @@
+nextest-version = "0.9.98"
+experimental = ["setup-scripts"]
+
+[profile.default]
+# Optimize for developer productivity
+retries = 2
+failure-output = "final"
+success-output = "never" 
+status-level = "retry"
+final-status-level = "slow"
+slow-timeout = { period = "30s", terminate-after = 2 }
+
+[profile.default.junit]
+path = "target/nextest/default/junit.xml"
+store-success-output = false
+store-failure-output = true
+
+[profile.ci]
+# Optimize for CI/CD reliability
+retries = 3
+failure-output = "immediate"
+fail-fast = false  # Run full suite in CI
+slow-timeout = { period = "60s", terminate-after = 2 }
+leak-timeout = "100ms"
+
+[profile.ci.junit]
+path = "target/nextest/ci/junit.xml"
+store-success-output = false
+store-failure-output = true
+
+# Test groups for optimal parallel execution
+[test-groups]
+integration = { max-threads = 4 }      # Integration tests
+ui-tests = { max-threads = 2 }         # UI tests (resource intensive)
+performance = { max-threads = 1 }      # Performance tests (need isolation)
+plugin-tests = { max-threads = 3 }     # Plugin loading/execution tests
+
+# Platform-specific optimizations
+[target.'cfg(target_os = "macos")']
+slow-timeout = "120s"  # macOS can be slower in CI
+
+[target.'cfg(target_os = "linux")']
+slow-timeout = "90s"
+
+[target.'cfg(target_os = "windows")']
+slow-timeout = "150s"  # Windows typically slower
+
+# Override configurations for specific test patterns
+[[profile.default.overrides]]
+filter = 'package(action_items_core) and test(test_deno_runtime)'
+slow-timeout = { period = "45s", terminate-after = 3 }
+test-group = "integration"
+
+[[profile.default.overrides]]
+filter = 'package(action_items_core) and test(test_plugin_loading)'
+test-group = "plugin-tests"
+retries = { count = 2, backoff = "exponential", delay = "1s" }
+
+[[profile.default.overrides]]
+filter = 'test(benchmark) or test(performance)'
+test-group = "performance"
+run-extra-args = ["--test-threads", "1"]
+
+# Setup scripts for complex test scenarios
+[[profile.default.scripts]]
+filter = 'package(action_items_core) and test(integration)'
+setup = "prepare-test-plugins"
+
+[scripts.setup.prepare-test-plugins]
+command = "cargo run --bin prepare-test-data"

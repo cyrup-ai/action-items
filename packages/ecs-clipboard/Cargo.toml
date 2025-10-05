@@ -1,0 +1,50 @@
+[package]
+name = "action_items_ecs_clipboard"
+version = { workspace = true }
+edition = { workspace = true }
+description = "Bevy ECS clipboard plugin for Action Items"
+
+[dependencies]
+bevy = { workspace = true }
+action_items_common = { path = "../common" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time", "rt"] }
+arboard = { version = "3.6.1", features = ["image-data"] }
+
+# Platform-specific clipboard APIs
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = ["Win32_System_DataExchange"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+sha2 = "0.10"
+
+# macOS uses existing objc2-app-kit with custom msg_send
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.5"
+objc2-app-kit = "0.2"
+
+[features]
+default = ["image-data"]
+image-data = ["arboard/image-data"]
+
+[lib]
+name = "action_items_ecs_clipboard"
+path = "src/lib.rs"
+
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.21"

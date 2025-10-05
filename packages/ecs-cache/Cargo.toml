@@ -1,0 +1,41 @@
+[package]
+name = "action_items_ecs_cache"
+version = { workspace = true }
+edition = { workspace = true }
+description = "Bevy ECS cache service wrapping goldylox high-performance cache"
+
+[dependencies]
+bevy = { workspace = true }
+goldylox = { path = "/Volumes/samsung_t9/goldylox" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time", "rt"] }
+uuid = { workspace = true, features = ["v4"] }
+log = { workspace = true }
+ahash = "0.8.12"
+crossbeam-channel = { workspace = true }
+
+[lib]
+name = "action_items_ecs_cache"
+path = "src/lib.rs"
+
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = ["compression"]
+compression = []

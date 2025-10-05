@@ -1,0 +1,18 @@
+[package]
+name = "action_items_ecs_preferences"
+version = { workspace = true }
+edition = { workspace = true }
+description = "ECS preferences management service"
+
+[dependencies]
+bevy = { workspace = true }
+action-items_ecs-ui = { path = "../ecs-ui" }
+ecs-hotkey = { path = "../ecs-hotkey" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+global-hotkey = "0.6.3"
+
+[lib]
+name = "action_items_ecs_preferences"
+path = "src/lib.rs"

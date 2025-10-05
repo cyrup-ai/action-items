@@ -1,0 +1,39 @@
+[package]
+name = "ecs-hotkey"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+description = "ECS hotkey service providing programmable global hotkey registration, capture, and conflict detection"
+license = "MIT"
+
+[dependencies]
+bevy = { workspace = true }
+global-hotkey = "0.7"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+dirs = "6"
+tokio = { workspace = true, features = ["rt", "macros", "time"] }
+crossbeam-channel = "0.5"
+
+# Platform-specific dependencies
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+accessibility-sys = "0.2"
+objc2 = "0.6"
+objc2-core-foundation = "0.3"
+objc2-core-graphics = "0.3"
+
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"

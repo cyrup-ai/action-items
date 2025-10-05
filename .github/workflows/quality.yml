@@ -1,0 +1,102 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache cargo index
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache cargo build
+      uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+    - name: Run clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Install nextest
+      run: cargo install cargo-nextest --locked
+
+    - name: Run tests with nextest
+      run: cargo nextest run --workspace --all-features --profile ci
+
+    - name: Install tarpaulin for coverage
+      run: cargo install cargo-tarpaulin
+
+    - name: Run test coverage
+      run: ./scripts/test-coverage.sh
+
+    - name: Check documentation
+      run: cargo doc --all-features --no-deps
+
+    - name: Check documentation coverage
+      run: ./scripts/doc-coverage.sh --threshold 95
+
+    - name: Generate documentation
+      run: ./scripts/generate-docs.sh --coverage --deploy
+
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+
+    - name: Security audit
+      run: cargo audit
+
+    - name: Generate quality report
+      run: |
+        mkdir -p quality-reports
+        ./scripts/quality_report.sh quality-reports
+      
+    - name: Upload quality report
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-report-${{ github.sha }}
+        path: quality-reports/
+
+    - name: Upload documentation
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation-${{ github.sha }}
+        path: docs-deploy/
+
+    - name: Upload documentation coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: doc-coverage-${{ github.sha }}
+        path: target/doc-coverage/
+
+    - name: Upload test coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-coverage-${{ github.sha }}
+        path: target/coverage/

@@ -1,0 +1,151 @@
+[package]
+name = "action_items"
+version = { workspace = true }
+edition = { workspace = true }
+
+[dependencies]
+action_items_common = { path = "../common" }
+action_items_core = { path = "../core" }
+action_items_ui = { path = "../ui" }
+global-hotkey = { workspace = true }
+env_logger = { workspace = true }
+thiserror.workspace = true
+tracing = "0.1.41"
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+cocoa = "0.26.1"
+objc = "0.2.7"
+raw-window-handle = "0.6.2"
+wayland-client = { version = "0.31", optional = true }
+wayland-protocols-wlr = { version = "0.3.9", optional = true }
+x11 = { version = "2.21", optional = true }
+xcb = { version = "1.6.0", optional = true }
+winit = "0.30.12"
+bevy.workspace = true
+lasso = { version = "0.7", features = ["multi-threaded"] }
+dirs = "6"
+serde = { workspace = true }
+serde_json = "1.0"
+tokio = { version = "1", features = ["fs"] }
+uuid = { workspace = true, features = ["v4"] }
+# ECS Services - Complete service ecosystem
+action_items_ecs_clipboard = { path = "../ecs-clipboard" }
+action_items_ecs_permissions = { version = "0.1.0", path = "../ecs-permissions" }
+action_items_ecs_preferences = { path = "../ecs-preferences" }
+action_items_ecs_search = { path = "../ecs-search" }
+action_items_ecs_settings = { path = "../ecs-settings" }
+action_items_ecs_search_aggregator = { path = "../ecs-search-aggregator" }
+ecs-task-management = { version = "0.1.0", path = "../ecs-task-management" }
+ecs-hotkey = { path = "../ecs-hotkey" }
+action_items_ecs_bluetooth = { path = "../ecs-bluetooth" }
+ecs-launcher = { path = "../ecs-launcher" }
+# Core service coordination
+ecs-service-bridge = { path = "../ecs-service-bridge" }
+# Data and persistence services
+action_items_ecs_surrealdb = { path = "../ecs-surrealdb" }
+action_items_ecs_user_settings = { path = "../ecs-user-settings" }
+action_items_ecs_cache = { path = "../ecs-cache" }
+# System services
+ecs-filesystem = { path = "../ecs-filesystem" }  # ECS filesystem service ✅
+ecs-notifications = { path = "../ecs-notifications" }
+action_items_ecs_fetch = { path = "../ecs-fetch" }
+action_items_ecs_progress = { path = "../ecs-progress" }  # Enabled - progress tracking needed
+action_items_ecs_ui = { package = "action-items_ecs-ui", version = "0.1.0", path = "../ecs-ui" }  # Enabled - UI service coordination needed
+ecs-tls = { path = "../ecs-tls" }
+action_items_ecs_compression = { version = "0.1.0", path = "../ecs-compression" }
+# Development runtime  
+action_items_ecs_deno = { path = "../ecs-deno" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.25.0"
+core-foundation = "0.10.1"
+objc2 = "0.6.2"
+objc2-app-kit = { version = "0.3.1", features = ["NSApplication", "NSRunningApplication", "NSWorkspace", "NSWindow"] }
+objc2-foundation = { version = "0.3.1", features = ["NSString", "NSArray", "NSProcessInfo", "NSURL"] }
+objc2-application-services = { version = "0.3.1", features = ["AXUIElement"] }
+# AVFoundation framework for camera/microphone permissions
+objc2-av-foundation = "0.3.1"
+# Permission framework dependencies for comprehensive TCC coverage
+objc2-core-location = "0.3.1"
+objc2-contacts = "0.3.1"
+objc2-event-kit = "0.3.1"
+objc2-core-bluetooth = "0.3.1"
+home = "0.5"
+block2 = "0.6.1"
+libc = "0.2"
+# Apple frameworks for native permission system - REAL IMPLEMENTATIONS ONLY
+cocoa = "0.26.1"
+objc = "0.2.7"
+# VERIFIED working permission dependencies from tauri-plugin-macos-permissions
+macos-accessibility-client = "0.0.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11 = { version = "2.21", features = ["xlib"] }
+wayland-client = "0.31"
+wayland-protocols-wlr = "0.3.9"
+
+[[bin]]
+name = "action_items"
+path = "src/main.rs"
+
+[features]
+wayland-client = ["dep:wayland-client"]
+wayland-protocols-wlr = ["dep:wayland-protocols-wlr"]
+x11 = ["dep:x11"]
+xcb = ["dep:xcb"]
+
+# Examples showing permission system usage across platforms
+[[example]]
+name = "camera_permission"
+path = "examples/camera_permission.rs"
+
+[[example]]
+name = "microphone_permission"
+path = "examples/microphone_permission.rs"
+
+[[example]]
+name = "screen_recording_permission"
+path = "examples/screen_recording_permission.rs"
+
+[[example]]
+name = "input_monitoring_permission"
+path = "examples/input_monitoring_permission.rs"
+
+[[example]]
+name = "full_disk_access_permission"
+path = "examples/full_disk_access_permission.rs"
+
+[[example]]
+name = "contacts_permission"
+path = "examples/contacts_permission.rs"
+
+[[example]]
+name = "calendar_permission"
+path = "examples/calendar_permission.rs"
+
+[[example]]
+name = "reminders_permission"
+path = "examples/reminders_permission.rs"
+
+[[example]]
+name = "location_permission"
+path = "examples/location_permission.rs"
+
+[[example]]
+name = "all_permissions"
+path = "examples/all_permissions.rs"
+
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"

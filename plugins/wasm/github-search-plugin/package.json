@@ -1,0 +1,18 @@
+{
+  "name": "github-search-plugin",
+  "version": "1.0.0",
+  "description": "GitHub repository search plugin for Modern Launcher",
+  "main": "dist/plugin.js",
+  "scripts": {
+    "build": "npm run clean && npm run compile && npm run bundle",
+    "clean": "rm -rf dist build",
+    "compile": "tsc",
+    "bundle": "extism-js build/plugin.js -o dist/github-search.wasm"
+  },
+  "devDependencies": {
+    "@extism/js-pdk": "^1.0.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {}
+}

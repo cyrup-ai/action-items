@@ -1,0 +1,222 @@
+//! Privacy indicator icon definitions
+//!
+//! Zero-allocation icon definitions for blazing-fast privacy indicator rendering.
+
+use bevy::prelude::*;
+
+/// Privacy indicator icon definitions using Unicode symbols for cross-platform compatibility
+pub struct PrivacyIcons;
+
+impl PrivacyIcons {
+    /// Full control indicator - horizontal line symbol
+    pub const FULL_CONTROL: &'static str = "─";
+    
+    /// No collection indicator - lock symbol  
+    pub const NO_COLLECTION: &'static str = "🔒";
+    
+    /// Encrypted indicator - shield symbol
+    pub const ENCRYPTED: &'static str = "🛡️";
+    
+    /// Info details button - info symbol
+    pub const INFO_DETAILS: &'static str = "ℹ️";
+
+    /// Get icon text for the specified privacy indicator type
+    #[inline]
+    pub fn get_icon_text(indicator_type: &crate::ui::ai_menu::IndicatorType) -> &'static str {
+        match indicator_type {
+            crate::ui::ai_menu::IndicatorType::FullControl => Self::FULL_CONTROL,
+            crate::ui::ai_menu::IndicatorType::NoCollection => Self::NO_COLLECTION,
+            crate::ui::ai_menu::IndicatorType::Encrypted => Self::ENCRYPTED,
+            crate::ui::ai_menu::IndicatorType::InfoDetails => Self::INFO_DETAILS,
+        }
+    }
+}
+
+/// Privacy icon theme colors for consistent visual design
+pub struct PrivacyIconTheme;
+
+impl PrivacyIconTheme {
+    /// Active state color (white)
+    pub const ACTIVE: Color = Color::srgb(1.0, 1.0, 1.0);
+    
+    /// Inactive state color (gray #888888)
+    pub const INACTIVE: Color = Color::srgb(0.53, 0.53, 0.53);
+    
+    /// Hover state color (light gray)
+    pub const HOVER: Color = Color::srgb(0.9, 0.9, 0.9);
+    
+    /// Pressed state color (darker gray)
+    pub const PRESSED: Color = Color::srgb(0.8, 0.8, 0.8);
+    
+    /// Container background (dark theme)
+    pub const CONTAINER_BG: Color = Color::srgb(0.16, 0.16, 0.16);
+    
+    /// Container border (subtle white)
+    pub const CONTAINER_BORDER: Color = Color::srgba(1.0, 1.0, 1.0, 0.1);
+}
+
+/// Privacy indicator container styling constants
+pub struct PrivacyContainerStyle;
+
+impl PrivacyContainerStyle {
+    /// Horizontal padding in pixels
+    pub const HORIZONTAL_PADDING: f32 = 8.0;
+    
+    /// Vertical padding in pixels  
+    pub const VERTICAL_PADDING: f32 = 6.0;
+    
+    /// Corner radius for subtle rounded corners
+    pub const CORNER_RADIUS: f32 = 4.0;
+    
+    /// Icon size in pixels
+    pub const ICON_SIZE: f32 = 16.0;
+    
+    /// Spacing between icons
+    pub const ICON_SPACING: f32 = 12.0;
+    
+    /// Container height (fixed to prevent layout shift)
+    pub const CONTAINER_HEIGHT: f32 = 28.0;
+}
+
+/// Component for privacy indicator icon rendering with efficient text caching
+#[derive(Component, Debug)]
+pub struct PrivacyIcon {
+    /// Cached icon text for this indicator
+    pub icon_text: &'static str,
+    /// Icon size for consistent rendering
+    pub size: f32,
+    /// Current visual state for color determination
+    pub is_active: bool,
+}
+
+impl PrivacyIcon {
+    /// Create new privacy icon for the specified indicator type
+    #[inline]
+    pub fn new(indicator_type: &crate::ui::ai_menu::IndicatorType) -> Self {
+        Self {
+            icon_text: PrivacyIcons::get_icon_text(indicator_type),
+            size: PrivacyContainerStyle::ICON_SIZE,
+            is_active: false,
+        }
+    }
+
+    /// Update active state and return true if changed
+    #[inline]
+    pub fn set_active(&mut self, active: bool) -> bool {
+        if self.is_active != active {
+            self.is_active = active;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// System to create privacy indicator UI layout with professional styling
+pub fn spawn_privacy_indicators_ui(
+    commands: &mut Commands,
+    font_handle: Handle<Font>,
+) -> Entity {
+    commands
+        .spawn(NodeBundle {
+            style: Style {
+                width: Val::Percent(100.0),
+                height: Val::Px(PrivacyContainerStyle::CONTAINER_HEIGHT),
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                align_items: AlignItems::Center,
+                padding: UiRect::all(Val::Px(PrivacyContainerStyle::HORIZONTAL_PADDING)),
+                margin: UiRect::bottom(Val::Px(8.0)),
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            background_color: BackgroundColor(PrivacyIconTheme::CONTAINER_BG),
+            border_color: BorderColor(PrivacyIconTheme::CONTAINER_BORDER),
+            ..default()
+        })
+        .with_children(|parent| {
+            // Full Control indicator
+            spawn_privacy_icon(
+                parent,
+                &crate::ui::ai_menu::IndicatorType::FullControl,
+                font_handle.clone(),
+            );
+
+            // No Collection indicator  
+            spawn_privacy_icon(
+                parent,
+                &crate::ui::ai_menu::IndicatorType::NoCollection,
+                font_handle.clone(),
+            );
+
+            // Encrypted indicator
+            spawn_privacy_icon(
+                parent,
+                &crate::ui::ai_menu::IndicatorType::Encrypted,
+                font_handle.clone(),
+            );
+
+            // Info Details button (interactive)
+            spawn_privacy_info_button(
+                parent,
+                font_handle,
+            );
+        })
+        .insert(crate::ui::ai_menu::PrivacyIndicators::default())
+        .id()
+}
+
+/// Spawn individual privacy indicator icon with proper styling
+#[inline]
+fn spawn_privacy_icon(
+    parent: &mut ChildBuilder,
+    indicator_type: &crate::ui::ai_menu::IndicatorType,
+    font_handle: Handle<Font>,
+) {
+    parent
+        .spawn((
+            Text::new(PrivacyIcons::get_icon_text(indicator_type)),
+            TextFont {
+                font: font_handle,
+                font_size: PrivacyContainerStyle::ICON_SIZE,
+                ..default()
+            },
+            TextColor(PrivacyIconTheme::INACTIVE),
+            PrivacyIcon::new(indicator_type),
+        ));
+}
+
+/// Spawn interactive privacy info button with hover and click handling
+#[inline]
+fn spawn_privacy_info_button(
+    parent: &mut ChildBuilder,
+    font_handle: Handle<Font>,
+) {
+    parent
+        .spawn(ButtonBundle {
+            style: Style {
+                width: Val::Px(PrivacyContainerStyle::ICON_SIZE + 4.0),
+                height: Val::Px(PrivacyContainerStyle::ICON_SIZE + 4.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            background_color: BackgroundColor(Color::NONE),
+            border_color: BorderColor(Color::NONE),
+            ..default()
+        })
+        .with_children(|button| {
+            button.spawn(TextBundle::from_section(
+                PrivacyIcons::INFO_DETAILS,
+                TextStyle {
+                    font: font_handle,
+                    font_size: PrivacyContainerStyle::ICON_SIZE,
+                    color: PrivacyIconTheme::ACTIVE,
+                },
+            ));
+        })
+        .insert(crate::ui::ai_menu::PrivacyIconButton::new(
+            crate::ui::ai_menu::IndicatorType::InfoDetails,
+        ));
+}

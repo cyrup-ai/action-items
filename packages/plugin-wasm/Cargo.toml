@@ -1,0 +1,61 @@
+[package]
+name = "action_items_wasm"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+bevy = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+crossbeam-channel = { workspace = true }
+dirs = { workspace = true }
+extism = { workspace = true }
+uuid = { workspace = true }
+moka = { workspace = true, features = ["sync"] }
+action_items_ecs_clipboard = { workspace = true }
+notify-rust = { workspace = true }
+reqwest = { workspace = true, features = ["json", "blocking"] }
+jwalk = { workspace = true }
+rayon = { workspace = true }
+log = { workspace = true }
+libloading = { workspace = true }
+
+# Common types and traits
+action_items_common = { path = "../common" }
+
+[lib]
+name = "action_items_wasm"
+path = "src/lib.rs"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Native file dialogs, etc.
+rfd = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux specific dependencies if any
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# MacOS specific dependencies if any
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Windows specific dependencies if any
+
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"
+
+[dev-dependencies]
+# Development/testing dependencies
+
+[features]
+default = []

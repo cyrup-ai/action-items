@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/software/polkit/docs/latest/policyconfig-1.dtd">
+
+<policyconfig>
+  <vendor>Action Items</vendor>
+  <vendor_url>https://github.com/cyrup-ai/action-items</vendor_url>
+
+  <action id="org.action-items.plugin.execute">
+    <description>Execute plugin code</description>
+    <message>Authentication is required to execute plugin code</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.action-items.plugin.file-access">
+    <description>Access files through plugin</description>
+    <message>Authentication is required for plugin file access</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.action-items.plugin.network-access">
+    <description>Network access through plugin</description>
+    <message>Authentication is required for plugin network access</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.action-items.plugin.clipboard-access">
+    <description>Clipboard access through plugin</description>
+    <message>Authentication is required for plugin clipboard access</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.action-items.plugin.system-info">
+    <description>System information access through plugin</description>
+    <message>Authentication is required for plugin system information access</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.action-items.plugin.process-control">
+    <description>Process control through plugin</description>
+    <message>Authentication is required for plugin process control</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.action-items.plugin.storage-access">
+    <description>Storage access through plugin</description>
+    <message>Authentication is required for plugin storage access</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

@@ -1,0 +1,128 @@
+[workspace]
+members = [
+    "packages/core",
+    "packages/ui",
+    "packages/app",
+    "packages/plugin-native",
+    "packages/plugin-native/macros",
+    "packages/plugin-wasm",
+    "packages/common",
+    "packages/ecs-deno",
+    "packages/ecs-clipboard",
+    "packages/ecs-permissions",
+    "packages/ecs-preferences",
+    "packages/ecs-notifications",
+    "packages/ecs-progress",
+    "packages/ecs-ui",
+    "packages/ecs-bluetooth",
+    "packages/ecs-search",
+    "packages/ecs-search-aggregator",
+    "packages/ecs-service-bridge",
+    "packages/ecs-settings",
+    "packages/ecs-surrealdb",
+    "packages/ecs-cache",
+    "packages/ecs-fetch",
+    "packages/ecs-tls",
+    "packages/ecs-hotkey",
+    "packages/ecs-launcher",
+    "packages/ecs-task-management",
+    "packages/ecs-filesystem",
+    "packages/ecs-compression",
+    "packages/ecs-native-menu",
+    "packages/ecs-user-settings"
+]
+exclude = ["tmp", "docs", "forks/surrealdb"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+rust-version = "1.86.0"
+authors = ["Action Items Team"]
+license = "MIT"
+license-file = "LICENSE"
+description = "Action Items - A powerful task and plugin management system"
+repository = "https://github.com/cyrup-ai/action-items"
+homepage = "https://github.com/cyrup-ai/action-items"
+keywords = ["database", "embedded-database", "realtime", "web", "surreal"]
+categories = ["database", "development-tools", "web-programming"]
+publish = false
+
+[workspace.metadata.docs.rs]
+all-features = true
+targets = ["x86_64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-pc-windows-msvc"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[workspace.metadata.docs]
+features = ["docs"]
+
+# Globally disable all warnings to suppress external dependency warnings
+[workspace.lints.rust]
+warnings = "allow"
+unused = "allow"
+unused_imports = "allow"
+unused_variables = "allow"
+unused_mut = "allow"
+dead_code = "allow"
+deprecated = "allow"
+# Suppress specific warnings that appear in SurrealDB fork
+private_interfaces = "allow"
+mismatched_lifetime_syntaxes = "allow"
+
+[workspace.dependencies]
+# System monitoring
+sysinfo = "0.37.0"
+
+bevy = { version = "0.16.1", features = [
+    "bevy_asset",
+    "bevy_color",
+    "bevy_gizmos",
+    "bevy_log",
+    "bevy_pbr",
+    "bevy_picking",
+    "bevy_render",
+    "bevy_sprite",
+    "bevy_state",
+    "bevy_text",
+    "bevy_ui",
+    "bevy_window",
+    "bevy_winit"
+], default-features = false }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2.3"
+crossbeam-channel = "0.5.15"
+futures = "0.3.31"
+libloading = "0.8.8"
+extism = "1.12.0"
+log = "0.4"
+moka = { version = "0.12", features = ["future"] }
+
+thiserror = "2"
+serde_v8 = { version = "0.271.0", default-features = false }
+v8 = { version = "140.2.0", default-features = false }
+env_logger = "0.11"
+global-hotkey = "0.7.0"
+dirs = "6.0.0"
+uuid = { version = "1.18", features = ["v4", "serde"] }
+async-graphql = { version = "7.0.17", default-features = false }
+action_items_ecs_clipboard = { path = "./packages/ecs-clipboard" }
+notify-rust = "4.11.7"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+jwalk = "0.8.1"
+rayon = "1"
+rfd = "0.15.4"
+syn = "2"
+quote = "1"
+proc-macro2 = "1"
+
+
+# Memory profiling dependencies
+tikv-jemalloc-ctl = { version = "0.6", features = ["profiling", "stats"] }       # jemalloc statistics
+
+# Fix temporal_rs v0.0.11 compatibility by forcing timezone_provider v0.0.11
+[patch.crates-io]
+timezone_provider = { git = "https://github.com/boa-dev/temporal", rev = "1980ece" }

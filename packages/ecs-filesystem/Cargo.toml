@@ -1,0 +1,81 @@
+[package]
+name = "ecs-filesystem"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+description = "Bevy ECS-based filesystem operations with security, performance, and cross-platform support"
+authors = ["Action Items Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/action-items/action-items"
+
+[dependencies]
+# Core Bevy ECS framework
+bevy = { workspace = true }
+
+# Async runtime and file I/O
+tokio = { version = "1.0", features = ["fs", "rt", "rt-multi-thread", "macros", "time", "sync", "io-util"] }
+tokio-stream = "0.1"
+futures = "0.3"
+
+# File system watching and notifications
+notify = { version = "8.2", optional = true }
+notify-debouncer-full = { version = "0.6", default-features = false, optional = true }
+notify-types = { version = "2.0", optional = true }
+
+# Serialization and data handling
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
+
+# Logging and error handling
+tracing = "0.1"
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Security and validation
+uuid = { version = "1.0", features = ["v4", "serde"] }
+sha2 = "0.10"
+blake3 = "1.5"
+
+# MIME type detection
+infer = "0.16"
+mime_guess = "2.0"
+
+# Performance optimizations
+memmap2 = { version = "0.9", optional = true }
+dashmap = "6.1"
+parking_lot = "0.12"
+crossbeam = "0.8"
+smallvec = { version = "1.13", features = ["serde"] }
+ahash = "0.8"
+
+# Cross-platform support
+cfg-if = "1.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+core-services = "0.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3", features = ["fileapi", "winbase", "winerror"] }
+windows-sys = { version = "0.60", features = ["Win32_Storage_FileSystem", "Win32_Foundation"] }
+
+[dev-dependencies]
+tempfile = "3.10"
+criterion = "0.5"
+test-log = "0.2"
+env_logger = "0.11"
+
+# [[bench]]
+# name = "filesystem_benchmarks"
+# harness = false
+
+[features]
+default = ["security", "performance", "watching"]
+security = []
+performance = ["memmap2"]
+watching = ["dep:notify", "dep:notify-debouncer-full", "dep:notify-types"]
+enterprise = ["security", "performance", "watching"]

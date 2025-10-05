@@ -1,0 +1,78 @@
+[package]
+name = "action_items_ecs_permissions"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+description = "Cross-platform system permissions management for Action Items"
+
+[dependencies]
+bevy.workspace = true
+action_items_common = { path = "../common" }
+action-items_ecs-ui = { path = "../ecs-ui" }
+action_items_ecs_progress = { path = "../ecs-progress" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time"] }
+dashmap = "6"
+once_cell = "1"
+dirs = "5"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+macos-accessibility-client = "0.0.1"
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-core-location = "0.3"
+objc2-contacts = "0.3"
+objc2-event-kit = "0.3"
+objc2-av-foundation = "0.3"
+objc2-core-bluetooth = "0.3"
+objc2-core-wlan = "0.3"
+objc2-photos = "0.3"
+objc2-speech = "0.3"
+block2 = "0.6"
+home = "0.5"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62", features = [
+    "Media_Capture",
+    "Devices_Geolocation",
+    "Security_Authorization_AppCapabilityAccess",
+    "Devices_Bluetooth",
+    "Networking_Connectivity",
+    "UI_UIAutomation",
+    "Foundation",
+    "Graphics_Capture",
+    "Win32_UI_Input",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Storage_FileSystem",
+    "Win32_Security",
+    "Win32_Foundation"
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "0.12", features = ["tokio"] }
+zbus = "5"
+dbus = "0.9"
+futures = "0.3"
+
+[lib]
+name = "action_items_ecs_permissions"
+path = "src/lib.rs"
+
+# Re-enable warnings for this workspace package
+[lints]
+
+[lints.rust]
+warnings = "warn"
+unused = "warn"
+unused_imports = "warn"
+unused_variables = "warn"
+unused_mut = "warn"
+dead_code = "warn"
+deprecated = "warn"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
