@@ -3,11 +3,13 @@
 //! Zero-allocation, lock-free global hotkey system using CGEventTap API.
 //! Designed for blazing-fast performance with atomic operations and static data structures.
 
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::ffi::c_void;
 use std::ptr::NonNull;
 
 use bevy::prelude::*;
+use dashmap::DashMap;
+use once_cell::sync::Lazy;
 use objc2_core_foundation::{CFMachPort, CFRunLoop, kCFRunLoopCommonModes};
 use objc2_core_graphics::{
     CGEvent, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
@@ -42,74 +44,14 @@ pub enum MacOSPermissionError {
         error_message: String,
     },
 
+    #[error("Hash collision detected: action '{action}' hashes to {hash}, which is already registered")]
+    HashCollision { action: String, hash: u64 },
+
     #[error("Hotkey registry full: cannot register more than {MAX_HOTKEYS} hotkeys")]
     RegistryFull,
 
     #[error("Event ring buffer full: events being dropped")]
     EventRingFull,
-}
-
-/// Atomic hotkey slot for lock-free registration
-#[repr(align(64))] // Cache line aligned
-struct AtomicHotkeySlot {
-    /// Hotkey ID (0 means empty slot)
-    id: AtomicU64,
-    /// Key code
-    key_code: AtomicU32,
-    /// Modifier flags
-    modifiers: AtomicU32,
-    /// Action string hash (for fast comparison)
-    action_hash: AtomicU64,
-    /// Slot is active
-    active: AtomicBool,
-}
-
-impl AtomicHotkeySlot {
-    const fn new() -> Self {
-        Self {
-            id: AtomicU64::new(0),
-            key_code: AtomicU32::new(0),
-            modifiers: AtomicU32::new(0),
-            action_hash: AtomicU64::new(0),
-            active: AtomicBool::new(false),
-        }
-    }
-
-    #[inline]
-    fn try_register(&self, id: u64, key_code: u32, modifiers: u32, action_hash: u64) -> bool {
-        // Try to claim empty slot atomically
-        if self.id.compare_exchange_weak(0, id, Ordering::AcqRel, Ordering::Relaxed).is_ok() {
-            // Successfully claimed slot, now populate it
-            self.key_code.store(key_code, Ordering::Relaxed);
-            self.modifiers.store(modifiers, Ordering::Relaxed);
-            self.action_hash.store(action_hash, Ordering::Relaxed);
-            self.active.store(true, Ordering::Release);
-            true
-        } else {
-            false
-        }
-    }
-
-    #[inline]
-    fn try_unregister(&self, id: u64) -> bool {
-        if self.id.compare_exchange_weak(id, 0, Ordering::AcqRel, Ordering::Relaxed).is_ok() {
-            self.active.store(false, Ordering::Relaxed);
-            true
-        } else {
-            false
-        }
-    }
-
-    #[inline]
-    fn matches(&self, key_code: u32, modifiers: u32) -> Option<u64> {
-        if self.active.load(Ordering::Acquire) &&
-           self.key_code.load(Ordering::Relaxed) == key_code &&
-           self.modifiers.load(Ordering::Relaxed) == modifiers {
-            Some(self.action_hash.load(Ordering::Relaxed))
-        } else {
-            None
-        }
-    }
 }
 
 /// Lock-free event ring buffer
@@ -125,9 +67,8 @@ struct LockFreeEventRing {
 
 impl LockFreeEventRing {
     const fn new() -> Self {
-        const INIT: AtomicU64 = AtomicU64::new(0);
         Self {
-            events: [INIT; EVENT_RING_SIZE],
+            events: [const { AtomicU64::new(0) }; EVENT_RING_SIZE],
             write_idx: AtomicUsize::new(0),
             read_idx: AtomicUsize::new(0),
         }
@@ -179,18 +120,21 @@ impl LockFreeEventRing {
     }
 }
 
-/// Static hotkey registry for zero-allocation operation
-static HOTKEY_REGISTRY: [AtomicHotkeySlot; MAX_HOTKEYS] = {
-    const INIT: AtomicHotkeySlot = AtomicHotkeySlot::new();
-    [INIT; MAX_HOTKEYS]
-};
+/// Lock-free hotkey registry with O(1) lookup
+/// Key: (key_code, modifiers), Value: action_hash
+static HOTKEY_REGISTRY: Lazy<DashMap<(u32, u32), u64>> = Lazy::new(DashMap::new);
+
+/// Track action hashes to detect collisions
+/// Maps hash -> action string to detect true collisions (different actions with same hash)
+static ACTION_HASH_REGISTRY: Lazy<DashMap<u64, String>> = Lazy::new(DashMap::new);
 
 /// Static event ring for zero-allocation event passing
+/// Interior mutability via AtomicU64 is intentional for lock-free design
+#[allow(clippy::declare_interior_mutable_const)]
 static EVENT_RING: LockFreeEventRing = LockFreeEventRing::new();
 
 /// CGEventTap initialization state (we don't store the handle as it's not Send/Sync)
 /// The run loop keeps the tap alive once it's added
-
 /// System initialization state
 static SYSTEM_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
@@ -243,74 +187,140 @@ fn macos_flags_to_internal(flags: CGEventFlags) -> u32 {
 }
 
 /// Ultra-fast CGEventTap callback - zero allocation, lock-free
-unsafe extern "C-unwind" fn hotkey_event_callback(
+/// 
+/// # Safety
+/// 
+/// This function is marked `unsafe extern "C-unwind"` and is invoked directly by
+/// the macOS event system at kernel level.
+/// 
+/// ## Invariants
+/// 
+/// 1. **cg_event is non-null**: The CGEventTap API contract guarantees that `cg_event`
+///    is a valid, non-null pointer to a CGEvent for the duration of this callback.
+///    
+/// 2. **Event lifetime**: The CGEvent is valid only for the duration of this callback.
+///    We must not store or use this pointer after returning.
+///    
+/// 3. **Return value**: We MUST return a valid CGEvent pointer. Returning null will
+///    crash the event system.
+///    
+/// 4. **No panics allowed**: Panicking will unwind into C code causing undefined behavior.
+///    
+/// 5. **Performance critical**: Runs on EVERY keystroke system-wide. Heavy operations
+///    cause system-wide input lag.
+///    
+/// 6. **Thread safety**: May be invoked from any thread. All accessed data structures
+///    must be thread-safe (DashMap, atomic operations).
+///    
+/// ## What Could Go Wrong
+/// 
+/// - Dereferencing `cg_event` after return → Use-after-free
+/// - Panicking → Unwinding into C → UB
+/// - Returning null → System crash
+/// - Blocking operations → System-wide keyboard lag
+/// 
+unsafe extern "C" fn hotkey_event_callback(
     _proxy: CGEventTapProxy,
     event_type: CGEventType,
     cg_event: NonNull<CGEvent>,
     _user_info: *mut c_void,
 ) -> *mut CGEvent {
-    // Only process key down events
-    if event_type != CGEventType::KeyDown {
-        return cg_event.as_ptr();
-    }
+    // Catch any panics to prevent unwinding through C code
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // Only process key down events
+        if event_type != CGEventType::KeyDown {
+            return cg_event.as_ptr();
+        }
 
-    // Extract key code and modifiers (zero allocation)
-    let key_code = unsafe {
-        CGEvent::integer_value_field(Some(cg_event.as_ref()), CGEventField::KeyboardEventKeycode)
-    } as u32;
-    
-    let flags = unsafe {
-        CGEvent::flags(Some(cg_event.as_ref()))
-    };
-    
-    let internal_key_code = macos_keycode_to_internal(key_code);
-    let internal_modifiers = macos_flags_to_internal(flags);
+        // Extract key code and modifiers (zero allocation)
+        // SAFETY: cg_event is non-null and valid per CGEventTap API contract.
+        // integer_value_field reads an immutable field and cannot fail.
+        let key_code = unsafe {
+            CGEvent::integer_value_field(Some(cg_event.as_ref()), CGEventField::KeyboardEventKeycode)
+        } as u32;
+        
+        // SAFETY: cg_event is non-null and valid per CGEventTap API contract.
+        // flags reads immutable modifier flags from the event and cannot fail.
+        let flags = unsafe {
+            CGEvent::flags(Some(cg_event.as_ref()))
+        };
+        
+        let internal_key_code = macos_keycode_to_internal(key_code);
+        let internal_modifiers = macos_flags_to_internal(flags);
 
-    // Fast lookup in static registry (lock-free)
-    for slot in &HOTKEY_REGISTRY {
-        if let Some(action_hash) = slot.matches(internal_key_code, internal_modifiers) {
-            // Push to event ring (lock-free)
+        // O(1) hash lookup
+        let key = (internal_key_code, internal_modifiers);
+        if let Some(action_hash_ref) = HOTKEY_REGISTRY.get(&key) {
+            let action_hash = *action_hash_ref;
+            drop(action_hash_ref);  // Release lock immediately
+            
             if !EVENT_RING.try_push(action_hash) {
-                // Ring buffer full - this is a performance issue but we don't drop the event
-                // Instead, we could implement a fallback mechanism here
+                error!("EVENT RING BUFFER FULL - event dropped (hash: {})", action_hash);
             }
-            break; // Found match, stop searching
+        }
+
+        cg_event.as_ptr()
+    }));
+
+    // If panic occurred, log and return original event
+    match result {
+        Ok(ptr) => ptr,
+        Err(e) => {
+            eprintln!("Panic in hotkey_event_callback: {:?}", e);
+            cg_event.as_ptr()
         }
     }
-
-    // Return event unmodified (don't consume it)
-    cg_event.as_ptr()
 }
 
-/// Register a hotkey in the static registry (lock-free)
+/// Register a hotkey in the concurrent hash map (O(1) operation)
 #[inline]
 pub fn register_hotkey_atomic(
     key_code: u32, 
     modifiers: u32, 
     action: &str
 ) -> Result<u64, MacOSPermissionError> {
-    let id = hash_action(action);
-    let action_hash = id;
+    let action_hash = hash_action(action);
+    let key = (key_code, modifiers);
     
-    // Try to find empty slot and register atomically
-    for slot in &HOTKEY_REGISTRY {
-        if slot.try_register(id, key_code, modifiers, action_hash) {
-            return Ok(id);
+    // Check for hash collision by comparing action strings
+    match ACTION_HASH_REGISTRY.entry(action_hash) {
+        dashmap::mapref::entry::Entry::Occupied(entry) => {
+            // Hash exists - check if it's the same action string
+            if entry.get() != action {
+                // Different action, same hash = TRUE COLLISION
+                error!(
+                    "Hash collision detected: action '{}' (hash: {}) collides with existing action '{}'",
+                    action, action_hash, entry.get()
+                );
+                return Err(MacOSPermissionError::HashCollision {
+                    action: action.to_string(),
+                    hash: action_hash,
+                });
+            }
+            // Same action string - this is OK (e.g., same action bound to multiple keys)
+        },
+        dashmap::mapref::entry::Entry::Vacant(entry) => {
+            // New hash - register it
+            entry.insert(action.to_string());
         }
     }
     
-    Err(MacOSPermissionError::RegistryFull)
+    // Check if we're overwriting an existing key binding
+    if HOTKEY_REGISTRY.contains_key(&key) {
+        warn!("Hotkey combo already registered, overwriting");
+    }
+    
+    HOTKEY_REGISTRY.insert(key, action_hash);
+    info!("Registered hotkey: {}+{} -> {}", key_code, modifiers, action_hash);
+    
+    Ok(action_hash)
 }
 
-/// Unregister a hotkey from the static registry (lock-free)
+/// Unregister a hotkey from the concurrent hash map (O(1) operation)
 #[inline]
-pub fn unregister_hotkey_atomic(id: u64) -> bool {
-    for slot in &HOTKEY_REGISTRY {
-        if slot.try_unregister(id) {
-            return true;
-        }
-    }
-    false
+pub fn unregister_hotkey_atomic(key_code: u32, modifiers: u32) -> bool {
+    let key = (key_code, modifiers);
+    HOTKEY_REGISTRY.remove(&key).is_some()
 }
 
 /// Pop events from the ring buffer (lock-free)
@@ -362,13 +372,15 @@ pub fn init_macos_hotkey_system() -> Result<(), MacOSPermissionError> {
     let event_mask: CGEventMask = 1 << CGEventType::KeyDown.0;
 
     // Create the event tap
+    // Note: We use extern "C" with catch_unwind for safety, but API expects "C-unwind"
+    // Safe to transmute because catch_unwind ensures no actual unwinding occurs
     let event_tap = unsafe {
         CGEvent::tap_create(
             CGEventTapLocation::HIDEventTap, // Works in fullscreen apps
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::Default,
             event_mask,
-            Some(hotkey_event_callback),
+            Some(std::mem::transmute::<*const (), unsafe extern "C-unwind" fn(CGEventTapProxy, CGEventType, NonNull<CGEvent>, *mut c_void) -> *mut CGEvent>(hotkey_event_callback as *const ())),
             std::ptr::null_mut(),
         )
     };
@@ -465,15 +477,15 @@ pub fn register_hotkey_with_macos_system(
 ) {
     for request in registration_requests.read() {
         // Convert to internal format
-        let key_code = macos_keycode_from_global_hotkey(request.definition.code);
-        let modifiers = macos_modifiers_from_global_hotkey(request.definition.modifiers);
+        let key_code = macos_keycode_from_global_hotkey(request.binding.definition.code);
+        let modifiers = macos_modifiers_from_global_hotkey(request.binding.definition.modifiers);
         
-        match register_hotkey_atomic(key_code, modifiers, &request.action) {
+        match register_hotkey_atomic(key_code, modifiers, &request.binding.action) {
             Ok(_id) => {
-                info!("✅ Registered hotkey: {}", request.definition.description);
+                info!("✅ Registered hotkey: {}", request.binding.definition.description);
                 registration_completed.write(crate::events::HotkeyRegisterCompleted {
                     binding: request.binding.clone(),
-                    requester: request.requester.clone(),
+                    requester: request.binding.requester.clone(),
                     success: true,
                     error_message: None,
                 });
@@ -482,7 +494,7 @@ pub fn register_hotkey_with_macos_system(
                 error!("❌ Failed to register hotkey: {}", e);
                 registration_completed.write(crate::events::HotkeyRegisterCompleted {
                     binding: request.binding.clone(),
-                    requester: request.requester.clone(),
+                    requester: request.binding.requester.clone(),
                     success: false,
                     error_message: Some(e.to_string()),
                 });

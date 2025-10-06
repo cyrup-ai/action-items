@@ -18,9 +18,7 @@ use ui::systems::{
     animate_hover_effects_system,
     animate_result_items_system,
     handle_keyboard_input,
-    handle_result_hover_effects,
     handle_result_item_click,
-    handle_result_selection,
     handle_visibility_animation_complete,  // App-specific visibility completion handler
     initialize_icon_system,
     gradient_selection_system, // App-specific gradient system (generic ones in GradientPlugin)
@@ -44,12 +42,15 @@ pub use action_items_ecs_ui::visibility::{
 };
 pub use ui::typography::{TextBundleBuilder, TypographyScale};
 pub use ui::{
-    FontAwesome, LauncherIconCache, IconExtractionRequest, IconExtractionResult,
+    LauncherIconCache,  // App-specific wrapper (keep)
     PrivacyConfiguration, PrivacyIndicatorPlugin, PrivacyIndicators,
     UiState, set_ui_visibility, systems,
 };
-// Re-export ecs-ui icon types
-pub use action_items_ecs_ui::icons::{IconSize, IconType, IconTheme, ThemeColors};
+// Re-export ecs-ui icon types (expanded set)
+pub use action_items_ecs_ui::icons::{
+    IconSize, IconType, IconTheme, ThemeColors, FontAwesome,
+    IconExtractionRequest, IconExtractionResult,
+};
 
 pub struct LauncherUiPlugin;
 
@@ -89,11 +90,7 @@ impl Plugin for LauncherUiPlugin {
             // Professional results display systems
             .add_systems(
                 Update,
-                (
-                    render_professional_results,
-                    handle_result_selection,
-                    handle_result_hover_effects,
-                ),
+                render_professional_results,
             )
             // UI visibility completion handler (generic animation is in VisibilityPlugin)
             .add_systems(Update, handle_visibility_animation_complete)
@@ -126,7 +123,6 @@ pub mod prelude {
     pub use crate::ui::components::{set_ui_visibility, *};
     pub use crate::ui::icons::*;
     pub use crate::ui::systems::{
-        adaptive_container_system, handle_keyboard_selection_highlighting_system,
-        handle_result_item_hover_system,
+        adaptive_container_system,
     };
 }

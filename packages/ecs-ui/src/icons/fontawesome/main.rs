@@ -6,9 +6,8 @@ use bevy::ui::TextShadow;
 
 use super::detection::IconDetection;
 use super::mappings::{ColorMappings, IconMappings, SizeConfigs};
-use action_items_ecs_ui::theme::Theme;
-use crate::ui::typography::TypographyScale;
-use crate::ui::icons::{IconSize, IconType};
+use crate::theme::Theme;
+use crate::icons::types::{IconSize, IconType};
 
 /// FontAwesome icon system with Unicode character mappings for zero-allocation icon rendering
 #[derive(Resource, Debug, Clone)]
@@ -71,7 +70,7 @@ impl FontAwesome {
         icon_type: IconType,
         size: IconSize,
         theme: &Theme,
-        typography: &TypographyScale,
+        font_handle: Handle<Font>,
     ) -> (Text, TextFont, TextColor, TextShadow) {
         let character = self.get_icon_char(icon_type);
         let color = self.get_icon_color(icon_type, theme);
@@ -80,7 +79,7 @@ impl FontAwesome {
         (
             Text::new(character.to_string()),
             TextFont {
-                font: typography.font_handles.fontawesome_solid.clone(),
+                font: font_handle,
                 font_size,
                 ..default()
             },

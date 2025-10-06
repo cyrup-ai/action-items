@@ -36,7 +36,7 @@ fn test_hotkey_plugin_initialization() {
     );
     assert!(
         app.world()
-            .contains_resource::<Events<HotkeyCaptureStarted>>()
+            .contains_resource::<Events<HotkeyCaptureRequested>>()
     );
 }
 
@@ -62,9 +62,6 @@ fn test_hotkey_registration_flow() {
         .resource_mut::<Events<HotkeyRegisterRequested>>();
     register_events.send(HotkeyRegisterRequested {
         binding: binding.clone(),
-        requester: "integration_test".to_string(),
-        action: "test_action".to_string(),
-        definition: hotkey_def,
     });
 
     // Run one update cycle
@@ -99,15 +96,9 @@ fn test_hotkey_conflict_detection() {
         .resource_mut::<Events<HotkeyRegisterRequested>>();
     register_events.send(HotkeyRegisterRequested {
         binding: binding1,
-        requester: "test1".to_string(),
-        action: "action1".to_string(),
-        definition: hotkey_def1,
     });
     register_events.send(HotkeyRegisterRequested {
         binding: binding2,
-        requester: "test2".to_string(),
-        action: "action2".to_string(),
-        definition: hotkey_def2,
     });
 
     // Run update cycles
@@ -138,10 +129,11 @@ fn test_hotkey_capture_state() {
     // Send capture start request
     let mut capture_events = app
         .world_mut()
-        .resource_mut::<Events<HotkeyCaptureStarted>>();
-    capture_events.send(HotkeyCaptureStarted {
+        .resource_mut::<Events<HotkeyCaptureRequested>>();
+    capture_events.send(HotkeyCaptureRequested {
         target_action: "test_capture".to_string(),
         requester: "integration_test".to_string(),
+        session_id: None,
     });
 
     // Run update cycle

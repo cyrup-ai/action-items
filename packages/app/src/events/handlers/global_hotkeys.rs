@@ -1,6 +1,6 @@
 use action_items_core::{LauncherEvent, LauncherEventType};
 use bevy::prelude::*;
-use ecs_hotkey::GlobalHotkeyManager;
+use ecs_hotkey::AppGlobalHotkeyManager;
 use ecs_launcher::{LauncherWindowToggled, WindowTrigger};
 use tracing::info;
 
@@ -13,7 +13,7 @@ use crate::window::activation::{ActivationReason, WindowActivationEvent};
 #[inline]
 pub fn handle_global_hotkeys(
     mut global_events: EventReader<GlobalHotkeyEvent>,
-    global_manager: Option<Res<GlobalHotkeyManager>>,
+    global_manager: Option<Res<AppGlobalHotkeyManager>>,
     mut launcher_events: EventWriter<LauncherEvent>,
     mut window_toggle_events: EventWriter<LauncherWindowToggled>,
     app_state: Res<State<AppState>>,

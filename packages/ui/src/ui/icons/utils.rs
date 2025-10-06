@@ -2,7 +2,9 @@
 use action_items_core::SearchResult;
 use bevy::prelude::*;
 
-use crate::ui::icons::types::{LauncherIconCache, IconType};
+// Import types from appropriate locations
+use crate::ui::icons::types::LauncherIconCache;  // App-specific wrapper
+use action_items_ecs_ui::icons::IconType;  // Generic type from ecs-ui
 
 pub fn get_icon_for_result(
     result: &action_items_core::plugins::ActionItem,

@@ -8,9 +8,8 @@ use bevy::render::render_asset::RenderAssetUsages;
 use bevy::tasks::{AsyncComputeTaskPool, Task, futures};
 use tracing::warn;
 
-use crate::ui::icons::types::{
-    LauncherIconCache, IconExtractionRequest, IconExtractionResult, IconSize, IconType,
-};
+use crate::ui::icons::types::LauncherIconCache;
+use action_items_ecs_ui::icons::{IconExtractionRequest, IconExtractionResult, IconSize};
 
 #[derive(Component)]
 pub struct IconExtractionInProgress(Task<CommandQueue>);
@@ -18,7 +17,6 @@ pub struct IconExtractionInProgress(Task<CommandQueue>);
 pub fn request_icon_extraction(
     events: &mut EventWriter<IconExtractionRequest>,
     result: &action_items_core::plugins::ActionItem,
-    icon_type: IconType,
     size: IconSize,
 ) {
     let path_str_option: Option<&str> = if let Some(icon_str) = &result.icon {
@@ -54,7 +52,6 @@ pub fn request_icon_extraction(
     let request = IconExtractionRequest {
         id: result.action.clone(),
         path,
-        icon_type,
         size,
     };
 

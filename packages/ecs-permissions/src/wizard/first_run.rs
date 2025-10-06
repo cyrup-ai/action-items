@@ -107,6 +107,7 @@ impl FirstRunDetector {
 
 /// Simplified wizard completion status for persistence
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct WizardCompletionStatus {
     /// Whether the wizard has been completed
     pub completed: bool,
@@ -116,15 +117,6 @@ pub struct WizardCompletionStatus {
     pub summary: Option<SerializableWizardSummary>,
 }
 
-impl Default for WizardCompletionStatus {
-    fn default() -> Self {
-        Self {
-            completed: false,
-            completed_at: None,
-            summary: None,
-        }
-    }
-}
 
 /// Partial wizard progress for resumption
 #[derive(Debug, Clone)]

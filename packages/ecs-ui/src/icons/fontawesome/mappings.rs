@@ -3,9 +3,9 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
-use action_items_ecs_ui::theme::Theme;
+use crate::theme::Theme;
 
-use crate::ui::icons::{IconType, types::IconSize};
+use crate::icons::types::{IconType, IconSize};
 
 /// Zero-allocation icon mappings using const arrays
 #[derive(Debug, Clone)]

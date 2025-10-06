@@ -256,17 +256,17 @@ fn insert_app_resources(app: &mut App) -> &mut App {
     .init_resource::<crate::window::state::ViewportState>()
     .init_resource::<ecs_service_bridge::systems::plugin_management::capability_index::PluginCapabilityIndex>();
 
-    // Initialize GlobalHotkeyManager with proper error handling for accessibility permissions
+    // Initialize AppGlobalHotkeyManager with proper error handling for accessibility permissions
     match global_hotkey::GlobalHotKeyManager::new() {
         Ok(manager) => {
-            app.insert_resource(ecs_hotkey::GlobalHotkeyManager {
+            app.insert_resource(ecs_hotkey::AppGlobalHotkeyManager {
                 manager,
                 toggle_hotkey: global_hotkey::hotkey::HotKey::new(
                     Some(global_hotkey::hotkey::Modifiers::SUPER | global_hotkey::hotkey::Modifiers::SHIFT),
                     global_hotkey::hotkey::Code::Space,
                 ),
             });
-            tracing::info!(" GlobalHotkeyManager initialized successfully");
+            tracing::info!("✅ AppGlobalHotkeyManager initialized successfully");
         }
         Err(e) => {
             warn!("Failed to initialize GlobalHotkeyManager: {}", e);

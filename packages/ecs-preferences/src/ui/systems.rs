@@ -66,12 +66,10 @@ pub fn handle_save_button(
     resource: Res<PreferencesResource>,
 ) {
     for interaction in button_query.iter() {
-        if *interaction == Interaction::Pressed {
-            if let Some(ref hotkey) = resource.captured_hotkey {
-                save_events.write(PreferencesSaveRequested {
-                    hotkey: hotkey.clone(),
-                });
-            }
+        if *interaction == Interaction::Pressed && resource.captured_hotkey.is_some() {
+            save_events.write(PreferencesSaveRequested {
+                hotkey: resource.captured_hotkey.as_ref().unwrap().clone(),
+            });
         }
     }
 }

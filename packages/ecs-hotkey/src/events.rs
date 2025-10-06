@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use global_hotkey::hotkey::{Code, Modifiers};
 use serde::{Deserialize, Serialize};
 
-use crate::resources::{HotkeyBinding, HotkeyId, HotkeyPreferences};
+use crate::resources::{CaptureSessionId, HotkeyBinding, HotkeyId, HotkeyPreferences};
 
 /// Definition of a hotkey combination
 /// Extracted from production preferences.rs
@@ -60,10 +60,8 @@ pub enum PreferencesEvent {
 /// Hotkey registration request event
 #[derive(Event, Debug, Clone)]
 pub struct HotkeyRegisterRequested {
+    /// Complete hotkey binding with all metadata
     pub binding: HotkeyBinding,
-    pub requester: String,
-    pub action: String,
-    pub definition: HotkeyDefinition,
 }
 
 /// Hotkey registration completion event
@@ -89,11 +87,14 @@ pub struct HotkeyUnregisterCompleted {
     pub success: bool,
 }
 
-/// Hotkey capture start event
+/// Hotkey capture request event
 #[derive(Event, Debug, Clone)]
-pub struct HotkeyCaptureStarted {
+pub struct HotkeyCaptureRequested {
     pub target_action: String,
     pub requester: String,
+    /// Optional session ID for multi-capture support
+    /// If None, uses default single-session behavior for backward compatibility
+    pub session_id: Option<CaptureSessionId>,
 }
 
 /// Hotkey capture completion event
@@ -101,6 +102,8 @@ pub struct HotkeyCaptureStarted {
 pub struct HotkeyCaptureCompleted {
     pub captured: HotkeyDefinition,
     pub target_action: String,
+    /// Session ID that captured this hotkey (for multi-capture support)
+    pub session_id: Option<CaptureSessionId>,
 }
 
 /// Hotkey capture cancellation reasons
@@ -117,6 +120,8 @@ pub enum CancelReason {
 pub struct HotkeyCaptureCancelled {
     pub reason: CancelReason,
     pub requester: String,
+    /// Session ID that was cancelled (for multi-capture support)
+    pub session_id: Option<CaptureSessionId>,
 }
 
 /// Hotkey pressed event
@@ -197,4 +202,37 @@ pub fn format_hotkey_description(modifiers: Modifiers, code: Code) -> String {
     }
 
     description
+}
+
+/// Request to switch active profile
+#[derive(Event, Debug, Clone)]
+pub struct HotkeyProfileSwitchRequested {
+    pub profile_name: String,
+    pub requester: String,
+}
+
+/// Profile switch completion result
+#[derive(Event, Debug, Clone)]
+pub struct HotkeyProfileSwitchCompleted {
+    pub profile_name: String,
+    pub success: bool,
+    pub error_message: Option<String>,
+}
+
+/// Profile created notification
+#[derive(Event, Debug, Clone)]
+pub struct HotkeyProfileCreated {
+    pub profile_name: String,
+}
+
+/// Profile deleted notification
+#[derive(Event, Debug, Clone)]
+pub struct HotkeyProfileDeleted {
+    pub profile_name: String,
+}
+
+/// Profile data updated (triggers persistence)
+#[derive(Event, Debug, Clone)]
+pub struct HotkeyProfilesUpdated {
+    pub reason: String,
 }

@@ -20,16 +20,14 @@ use super::systems::*;
 /// - `text_truncation_system` - Iterative truncation with real pixel measurements
 ///
 /// # Example
-/// ```rust
+/// ```rust,no_run
 /// use bevy::prelude::*;
 /// use action_items_ecs_ui::responsive::ResponsivePlugin;
 ///
-/// fn main() {
-///     App::new()
-///         .add_plugins(DefaultPlugins)
-///         .add_plugins(ResponsivePlugin)
-///         .run();
-/// }
+/// App::new()
+///     .add_plugins(DefaultPlugins)
+///     .add_plugins(ResponsivePlugin)
+///     .run();
 /// ```
 #[derive(Debug, Default, Clone)]
 pub struct ResponsivePlugin;

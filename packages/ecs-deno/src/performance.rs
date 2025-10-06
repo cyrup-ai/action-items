@@ -769,8 +769,8 @@ impl PerformanceStatistics {
         let average = total / count as u32;
         
         let median_index = count / 2;
-        let median = if count.is_multiple_of(2) && count > 1 {
-            Duration::from_nanos(((sorted_durations[median_index - 1].as_nanos() + 
+        let median = if count % 2 == 0 && count > 1 {
+            Duration::from_nanos(((sorted_durations[median_index - 1].as_nanos() +
                                  sorted_durations[median_index].as_nanos()) / 2) as u64)
         } else {
             sorted_durations[median_index]

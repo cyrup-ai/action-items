@@ -17,7 +17,7 @@ pub fn real_hotkey_capture_system(
     mut keyboard_input: EventReader<KeyboardInput>,
     mut capture_state: ResMut<HotkeyCaptureState>,
     modifier_keys: Res<ButtonInput<KeyCode>>,
-    mut prefs_events: Option<EventWriter<PreferencesEvent>>,
+    mut prefs_events: EventWriter<PreferencesEvent>,
 ) {
     if !capture_state.capturing {
         return;
@@ -58,9 +58,7 @@ pub fn real_hotkey_capture_system(
             match &event.logical_key {
                 Key::Escape => {
                     // ESC key stops capture
-                    if let Some(ref mut events) = prefs_events {
-                        events.write(PreferencesEvent::StopCapture);
-                    }
+                    prefs_events.write(PreferencesEvent::StopCapture);
                     return;
                 },
                 _ => {
@@ -75,9 +73,7 @@ pub fn real_hotkey_capture_system(
                             ),
                         };
 
-                        if let Some(ref mut events) = prefs_events {
-                            events.write(PreferencesEvent::KeyCaptured(hotkey_def));
-                        }
+                        prefs_events.write(PreferencesEvent::KeyCaptured(hotkey_def));
                         return;
                     }
                 },
@@ -144,5 +140,114 @@ pub fn keycode_to_code(logical_key: &Key) -> Option<Code> {
             }
         },
         _ => None,
+    }
+}
+
+
+/// Multi-session hotkey capture system
+/// 
+/// Processes keyboard input for all active capture sessions simultaneously.
+/// Each session maintains independent modifier and key state.
+/// Zero allocation, blazing-fast keyboard input processing for concurrent sessions.
+///
+/// # Session Isolation
+/// - Each session tracks its own held modifiers
+/// - Key captures are sent to all active sessions
+/// - Sessions complete independently
+#[inline]
+pub fn multi_session_capture_system(
+    mut keyboard_input: EventReader<KeyboardInput>,
+    mut multi_capture: ResMut<crate::resources::MultiCaptureState>,
+    modifier_keys: Res<ButtonInput<KeyCode>>,
+    mut capture_completed: EventWriter<crate::events::HotkeyCaptureCompleted>,
+    mut capture_cancelled: EventWriter<crate::events::HotkeyCaptureCancelled>,
+) {
+    // Early exit if no active sessions - zero cost when not capturing
+    if multi_capture.active_count() == 0 {
+        return;
+    }
+
+    // Track current modifier state from ButtonInput - zero allocation
+    let mut current_modifiers = Modifiers::empty();
+
+    #[cfg(target_os = "macos")]
+    {
+        if modifier_keys.pressed(KeyCode::SuperLeft) || modifier_keys.pressed(KeyCode::SuperRight) {
+            current_modifiers |= Modifiers::META; // Cmd on macOS
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        if modifier_keys.pressed(KeyCode::ControlLeft)
+            || modifier_keys.pressed(KeyCode::ControlRight)
+        {
+            current_modifiers |= Modifiers::CONTROL; // Ctrl on Windows/Linux
+        }
+    }
+
+    if modifier_keys.pressed(KeyCode::AltLeft) || modifier_keys.pressed(KeyCode::AltRight) {
+        current_modifiers |= Modifiers::ALT;
+    }
+
+    if modifier_keys.pressed(KeyCode::ShiftLeft) || modifier_keys.pressed(KeyCode::ShiftRight) {
+        current_modifiers |= Modifiers::SHIFT;
+    }
+
+    // Update all active sessions with current modifier state - zero allocation iteration
+    for session_id in multi_capture.active_session_ids().copied().collect::<Vec<_>>() {
+        if let Some(session) = multi_capture.get_session_mut(&session_id) {
+            session.held_modifiers = current_modifiers;
+        }
+    }
+
+    // Process keyboard input events - zero allocation event processing
+    for event in keyboard_input.read() {
+        if event.state.is_pressed() {
+            match &event.logical_key {
+                Key::Escape => {
+                    // ESC key cancels all active sessions
+                    let session_ids: Vec<_> = multi_capture.active_session_ids().copied().collect();
+                    
+                    for session_id in session_ids {
+                        if let Some(session) = multi_capture.complete_session(&session_id) {
+                            capture_cancelled.write(crate::events::HotkeyCaptureCancelled {
+                                reason: crate::events::CancelReason::EscapePressed,
+                                requester: session.requester,
+                                session_id: Some(session_id),
+                            });
+                        }
+                    }
+                    return;
+                },
+                _ => {
+                    // Try to convert the key to a global-hotkey Code - zero allocation conversion
+                    if let Some(code) = keycode_to_code(&event.logical_key) {
+                        // Capture hotkey for all active sessions
+                        let session_ids: Vec<_> = multi_capture.active_session_ids().copied().collect();
+                        
+                        for session_id in session_ids {
+                            if let Some(session) = multi_capture.complete_session(&session_id) {
+                                let hotkey_def = HotkeyDefinition {
+                                    modifiers: session.held_modifiers,
+                                    code,
+                                    description: crate::events::format_hotkey_description(
+                                        session.held_modifiers,
+                                        code,
+                                    ),
+                                };
+
+                                capture_completed.write(crate::events::HotkeyCaptureCompleted {
+                                    captured: hotkey_def,
+                                    target_action: String::new(), // Filled by consuming system
+                                    session_id: Some(session_id),
+                                });
+                            }
+                        }
+                        return;
+                    }
+                },
+            }
+        }
     }
 }

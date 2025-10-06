@@ -163,9 +163,6 @@ pub fn setup_default_hotkey_mappings_system(
 
             hotkey_register_events.write(HotkeyRegisterRequested {
                 binding,
-                requester: "launcher_bridge".to_string(),
-                action: action_id.to_string(),
-                definition,
             });
         }
     }
@@ -199,9 +196,6 @@ pub fn sync_preferences_to_hotkeys_system(
 
                 hotkey_register_events.write(HotkeyRegisterRequested {
                     binding,
-                    requester: "launcher_preferences".to_string(),
-                    action: action.clone(),
-                    definition,
                 });
             }
         }

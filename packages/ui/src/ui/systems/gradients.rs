@@ -5,25 +5,25 @@
 
 use bevy::prelude::*;
 use action_items_ecs_ui::gradients::{GradientComponent, GradientInteractionState};
-use crate::ui::components::{ActionResultItem, UiState};
+use crate::ui::components::{ActionItemsSearchResultItem, UiState};
 
 /// Gradient selection system for Action Items search results
 ///
-/// Application-specific system that updates gradient states based on ActionResultItem selection.
+/// Application-specific system that updates gradient states based on ActionItemsSearchResultItem selection.
 /// Integrates with the Action Items UI state to provide visual feedback for the selected result.
 ///
 /// This is application-specific because it uses:
-/// - `ActionResultItem` - Action Items specific component
+/// - `ActionItemsSearchResultItem` - Action Items specific component
 /// - `UiState.selected_index` - Action Items specific state management
 #[inline]
 pub fn gradient_selection_system(
     mut gradient_components: Query<(Entity, &mut GradientComponent)>,
-    result_items: Query<(Entity, &ActionResultItem)>,
+    result_items: Query<(Entity, &ActionItemsSearchResultItem)>,
     ui_state: Res<UiState>,
 ) {
     // Update gradient components based on selection state
     for (entity, mut gradient_component) in gradient_components.iter_mut() {
-        // Find if this entity has ActionResultItem with index matching selected_index
+        // Find if this entity has ActionItemsSearchResultItem with index matching selected_index
         let is_selected = result_items
             .iter()
             .any(|(e, item)| e == entity && item.index == ui_state.selected_index);

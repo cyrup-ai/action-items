@@ -16,15 +16,13 @@ use super::systems::*;
 /// - Performance optimization and validation
 ///
 /// # Example
-/// ```rust
+/// ```rust,no_run
 /// use bevy::prelude::*;
 /// use action_items_ecs_ui::gradients::GradientPlugin;
 ///
-/// fn main() {
-///     App::new()
-///         .add_plugins(GradientPlugin)
-///         .run();
-/// }
+/// App::new()
+///     .add_plugins(GradientPlugin)
+///     .run();
 /// ```
 #[derive(Debug, Default, Clone)]
 pub struct GradientPlugin;
@@ -41,6 +39,8 @@ impl Plugin for GradientPlugin {
                     apply_gradient_system,
                     interactive_gradient_system,
                     animate_gradient_transitions_system,
+                    interactive_gradient_interactive_system,
+                    animate_interactive_gradient_transitions_system,
                 ),
             )
             // Performance and validation systems (run when theme changes)

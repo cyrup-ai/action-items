@@ -13,20 +13,9 @@ use crate::ui::components::{
     ActionItemsSearchResultTitle, ResultsContainer, UiFonts,
 };
 use crate::ui::icons::{LauncherIconCache, get_icon_for_search_result};
+use action_items_ecs_ui::gradients::GradientComponent;
 use action_items_ecs_ui::theme::{ShadowElevation, Theme};
 use crate::ui::typography::TypographyScale;
-
-// Type aliases for complex query types
-type HoverEffectsQuery<'w, 's> = Query<
-    'w,
-    's,
-    (
-        &'static Interaction,
-        &'static mut BackgroundColor,
-        &'static ActionItemsSearchResultItem,
-    ),
-    (Changed<Interaction>, With<ActionItemsSearchResultBackground>),
->;
 
 /// System to render professional search results with Raycast-quality styling
 /// Updates results display when search results change
@@ -75,11 +64,6 @@ pub fn render_professional_results(
     commands.entity(container_entity).with_children(|parent| {
         for (index, result_data) in professional_results.iter().enumerate() {
             let is_selected = index == 0; // First item is selected by default
-            let background_color = if is_selected {
-                Color::srgba(0.3, 0.6, 1.0, 0.15) // Selected state
-            } else {
-                Color::NONE // Default transparent
-            };
 
             parent
                 .spawn((
@@ -92,7 +76,7 @@ pub fn render_professional_results(
                         margin: UiRect::bottom(Val::VMin(0.5)),
                         ..default()
                     },
-                    BackgroundColor(background_color),
+                    BackgroundColor(Color::NONE),
                     BorderRadius::all(Val::VMin(0.8)),
                     theme.create_box_shadow(ShadowElevation::SM),
                     ActionItemsSearchResultItem {
@@ -102,6 +86,7 @@ pub fn render_professional_results(
                     },
                     ActionItemsSearchResultBackground,
                     Interaction::default(),
+                    GradientComponent::list_item(),
                 ))
                 .with_children(|result_parent| {
                     // Icon container (left side)
@@ -216,46 +201,4 @@ pub fn render_professional_results(
     );
 }
 
-/// System to handle result item selection and highlighting
-/// Updates visual states based on keyboard navigation or mouse interaction
-#[inline]
-pub fn handle_result_selection(
-    mut result_items: Query<(&mut BackgroundColor, &ActionItemsSearchResultItem)>,
-    ui_state: Res<crate::ui::components::UiState>,
-) {
-    for (mut background, result_item) in result_items.iter_mut() {
-        let should_be_selected = result_item.index == ui_state.selected_index;
 
-        if result_item.is_selected != should_be_selected {
-            // Update background color based on selection state
-            background.0 = if should_be_selected {
-                Color::srgba(0.3, 0.6, 1.0, 0.15) // Selected
-            } else {
-                Color::NONE // Default
-            };
-        }
-    }
-}
-
-/// System to handle result item hover effects
-/// Provides visual feedback for mouse interactions
-#[inline]
-pub fn handle_result_hover_effects(mut result_items: HoverEffectsQuery) {
-    for (interaction, mut background, result_item) in result_items.iter_mut() {
-        match *interaction {
-            Interaction::Hovered => {
-                if !result_item.is_selected {
-                    background.0 = Color::srgba(1.0, 1.0, 1.0, 0.05); // Subtle hover
-                }
-            },
-            Interaction::Pressed => {
-                background.0 = Color::srgba(0.3, 0.6, 1.0, 0.25); // Pressed feedback
-            },
-            Interaction::None => {
-                if !result_item.is_selected {
-                    background.0 = Color::NONE; // Return to default
-                }
-            },
-        }
-    }
-}

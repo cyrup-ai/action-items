@@ -532,10 +532,8 @@ fn detect_current_platform() -> Platform {
         Platform::MacOS
     } else if cfg!(target_os = "windows") {
         Platform::Windows
-    } else if cfg!(target_os = "linux") {
-        Platform::Linux
     } else {
-        Platform::Linux // Default fallback
+        Platform::Linux // Default for Linux and unknown platforms
     }
 }
 

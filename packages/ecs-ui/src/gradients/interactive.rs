@@ -56,3 +56,14 @@ impl InteractiveGradient {
         }
     }
 }
+
+/// Component tracking active color transition animations for InteractiveGradient
+/// 
+/// Automatically added/removed by interactive_gradient_interactive_system.
+/// Manages smooth color interpolation using AnimationState.
+#[derive(Component, Debug)]
+pub struct InteractiveGradientTransition {
+    pub from_color: Color,
+    pub to_color: Color,
+    pub animation: crate::animations::AnimationState,
+}

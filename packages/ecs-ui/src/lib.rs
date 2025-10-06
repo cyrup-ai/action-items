@@ -121,14 +121,46 @@ pub use gradients::{
     GradientPlugin,
     GradientTheme,
     InteractiveGradient,
+    InteractiveGradientTransition,
     // Gradient systems
     animate_gradient_transitions_system,
+    animate_interactive_gradient_transitions_system,
     apply_gradient_system,
     dynamic_gradient_theme_system,
     gradient_accessibility_system,
     interactive_gradient_system,
+    interactive_gradient_interactive_system,
     optimize_gradient_performance_system,
     validate_gradient_theme_system,
+};
+
+// Icon system infrastructure
+pub mod icons;
+pub use icons::{
+    // Plugin
+    IconPlugin,
+    // Core types
+    IconSize,
+    IconType,
+    IconCache,
+    IconTheme,
+    ThemeColors,
+    // Components
+    IconComponent,
+    IconInteractionState,
+    IconAnimation,
+    // Events
+    IconExtractionRequest,
+    IconExtractionResult,
+    IconColorChangeEvent,
+    IconSizeChangeEvent,
+    IconStateChangeEvent,
+    IconAnimationCompleteEvent,
+    IconAnimationType,
+    // FontAwesome
+    FontAwesome,
+    IconDetection,
+    IconFallback,
 };
 
 // Responsive layout system for viewport-based sizing
@@ -168,10 +200,6 @@ pub use performance::{
     WarningLevel,
 };
 
-// Icon system for file and content type icons
-pub mod icons;
-pub use icons::{IconCache, IconSize, IconTheme, IconType, ThemeColors};
-
 // Public API prelude module for convenient imports
 pub mod prelude {
     // Default plugins and system sets
@@ -199,6 +227,7 @@ pub mod prelude {
         GradientPlugin,
         GradientTheme,
         InteractiveGradient,
+        InteractiveGradientTransition,
     };
     // Visibility events
     pub use crate::visibility::{

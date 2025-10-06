@@ -1,40 +1,34 @@
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
-
+use std::collections::HashMap;
 use bevy::prelude::*;
 
-// Import generic types from ecs-ui
-pub use action_items_ecs_ui::icons::{IconSize, IconType, ThemeColors, IconTheme};
+// Import base types from ecs-ui (used by LauncherIconCache)
+use action_items_ecs_ui::icons::{IconCache, IconType};
 
-// App-specific icon extraction events
-#[derive(Event, Clone)]
-pub struct IconExtractionRequest {
-    pub id: String,
-    pub path: PathBuf,
-    pub icon_type: IconType,
-    pub size: IconSize,
-}
+// Re-export ecs-ui events (remove local duplicates)
+pub use action_items_ecs_ui::icons::{IconExtractionRequest, IconExtractionResult};
 
-#[derive(Event)]
-pub struct IconExtractionResult {
-    pub id: String,
-    pub icon_data: Vec<u8>,
-    pub width: u32,
-    pub height: u32,
-}
-
-/// Resource for managing pending icon extraction requests
-#[derive(Resource, Default)]
-pub struct IconExtractionQueue {
-    pub pending: Vec<String>,
-}
-
-// Extended icon cache for launcher-specific functionality
-// Wraps ecs-ui IconCache and adds generic icon fallback system
+/// Launcher-specific icon cache with generic fallback system
+///
+/// Wraps ecs-ui's IconCache and adds launcher-specific fallback icons.
+/// When an icon can't be loaded (app deleted, permission denied, etc.),
+/// the launcher shows a generic icon based on type (folder, app, document).
+///
+/// # Architecture
+/// - `base`: Standard icon cache from ecs-ui (loaded_icons, failed_to_load)
+/// - `generic_icons`: Launcher fallback system (IconType → generic Handle<Image>)
+///
+/// # Example
+/// ```rust
+/// // Try loaded icon first, fallback to generic
+/// let icon = cache.loaded_icons().get(&app_path)
+///     .or_else(|| cache.generic_icons.get(&IconType::Application))
+///     .cloned()
+///     .unwrap_or_default();
+/// ```
 #[derive(Resource, Default)]
 pub struct LauncherIconCache {
     /// Base cache from ecs-ui
-    pub base: action_items_ecs_ui::icons::IconCache,
+    pub base: IconCache,
     /// Launcher-specific: fallback icons by type
     pub generic_icons: HashMap<IconType, Handle<Image>>,
 }
@@ -44,20 +38,20 @@ impl LauncherIconCache {
         Self::default()
     }
     
-    // Convenience accessors that delegate to base
-    pub fn loaded_icons(&self) -> &HashMap<String, Handle<Image>> {
+    // Delegate to base for standard operations
+    pub fn loaded_icons(&self) -> &std::collections::HashMap<String, Handle<Image>> {
         &self.base.loaded_icons
     }
     
-    pub fn loaded_icons_mut(&mut self) -> &mut HashMap<String, Handle<Image>> {
+    pub fn loaded_icons_mut(&mut self) -> &mut std::collections::HashMap<String, Handle<Image>> {
         &mut self.base.loaded_icons
     }
     
-    pub fn failed_to_load(&self) -> &HashSet<String> {
+    pub fn failed_to_load(&self) -> &std::collections::HashSet<String> {
         &self.base.failed_to_load
     }
     
-    pub fn failed_to_load_mut(&mut self) -> &mut HashSet<String> {
+    pub fn failed_to_load_mut(&mut self) -> &mut std::collections::HashSet<String> {
         &mut self.base.failed_to_load
     }
 }

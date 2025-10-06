@@ -8,7 +8,7 @@ use std::collections::HashMap;
 thread_local! {
     pub static MENU_ITEMS: RefCell<HashMap<String, MenuItem>> = RefCell::new(HashMap::new());
     pub static CHECK_MENU_ITEMS: RefCell<HashMap<String, CheckMenuItem>> = RefCell::new(HashMap::new());
-    pub static GLOBAL_MENU: RefCell<Option<Menu>> = RefCell::new(None);
+    pub static GLOBAL_MENU: RefCell<Option<Menu>> = const { RefCell::new(None) };
 }
 
 pub fn set_global_menu(menu: Menu) {

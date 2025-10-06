@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 
-use crate::ui::icons::IconType;
+use crate::icons::types::IconType;
 
 /// Fallback icon system for graceful degradation
 #[derive(Resource, Debug, Clone)]

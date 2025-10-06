@@ -1,21 +1,38 @@
-pub mod extraction;
-pub mod fontawesome;
-pub mod generation;
-pub mod privacy_icons; // Re-enabled to fix warnings
-pub mod types;
-pub mod utils;
+//! Launcher icon system - app-specific helpers + ecs-ui infrastructure
 
-// Re-export public types and functions
-pub use extraction::{
-    process_icon_extraction_requests, process_icon_extraction_results, request_icon_extraction,
+// App-specific modules
+pub mod extraction;  // Uses LauncherIconCache, launcher path formats
+pub mod privacy_icons;  // Privacy indicator UI (launcher-specific)
+pub mod types;  // LauncherIconCache wrapper
+pub mod utils;  // ActionItem/SearchResult → IconType mapping
+
+// Re-export ecs-ui infrastructure
+pub use action_items_ecs_ui::icons::{
+    // Core types
+    IconType, IconSize, IconTheme, ThemeColors,
+    // FontAwesome system
+    FontAwesome, IconDetection, IconFallback,
+    // Events
+    IconExtractionRequest, IconExtractionResult,
+    IconColorChangeEvent, IconSizeChangeEvent,
+    // Components (if needed for custom icon UI)
+    IconComponent, IconInteractionState, IconAnimation,
 };
-pub use generation::create_generic_icon;
-pub use privacy_icons::{
-    PrivacyContainerStyle, PrivacyIconTheme, PrivacyIcons, spawn_privacy_indicators_ui,
-};
-pub use types::{
-    LauncherIconCache, IconExtractionQueue, IconExtractionRequest, IconExtractionResult,
-};
-// Re-export ecs-ui icon types
-pub use action_items_ecs_ui::icons::{IconSize, IconType, ThemeColors, IconTheme};
+
+// Re-export app-specific types
+pub use types::LauncherIconCache;
+
+// Re-export app-specific helpers
 pub use utils::{get_icon_for_result, get_icon_for_search_result};
+pub use privacy_icons::{
+    PrivacyContainerStyle, PrivacyIconTheme, PrivacyIcons,
+    spawn_privacy_indicators_ui,
+};
+
+// Re-export extraction utilities
+pub use extraction::{
+    request_icon_extraction,
+    process_icon_extraction_requests,
+    poll_icon_extraction_tasks,
+    process_icon_extraction_results,
+};

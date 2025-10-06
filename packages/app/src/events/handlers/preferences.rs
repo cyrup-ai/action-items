@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use ecs_filesystem::{
     FileContent, FileOperationId, FileSystemError, FileSystemRequest, FileSystemResponse,
 };
-use ecs_hotkey::{GlobalHotkeyManager, HotkeyPreferences};
+use ecs_hotkey::{AppGlobalHotkeyManager, HotkeyPreferences};
 use global_hotkey::hotkey::{HotKey, Modifiers};
 use serde_json;
 use tracing::{debug, error, info};
@@ -35,7 +35,7 @@ pub fn handle_preferences_events(
     mut prefs_state: ResMut<PreferencesResource>,
     _app_state: Res<State<AppState>>,
     mut next_state: ResMut<NextState<AppState>>,
-    global_manager: Option<Res<GlobalHotkeyManager>>,
+    global_manager: Option<Res<AppGlobalHotkeyManager>>,
     mut ui_visibility_events: EventWriter<UiVisibilityEvent>,
     mut activation_events: EventWriter<WindowActivationEvent>,
     mut filesystem_events: EventWriter<FileSystemRequest>,

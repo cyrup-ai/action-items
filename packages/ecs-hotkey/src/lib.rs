@@ -1,46 +1,46 @@
-//! ECS Hotkey Service
+//! # ecs-hotkey - ECS Global Hotkey Service
 //!
-//! A comprehensive ECS service for managing global hotkeys with support for:
-//! - Programmable hotkey registration and conflict detection
-//! - Real-time hotkey capture for user customization
-//! - Cross-platform global hotkey polling
-//! - Event-driven architecture for loose coupling
+//! ## Architecture
 //!
-//! # Usage
+//! This crate uses **TWO complementary hotkey systems**:
 //!
-//! ```rust
+//! ### 1. Registration & Firing (via global-hotkey crate)
+//! - Register predefined hotkeys with the OS
+//! - Emit `HotkeyPressed` events when hotkeys are triggered
+//! - Cross-platform: Windows (RegisterHotKey), Linux (XGrabKey), macOS (Carbon)
+//! - **Only monitors registered hotkeys** (cannot detect arbitrary keypresses)
+//!
+//! ### 2. Capture (via platform-specific APIs)
+//! - Record arbitrary user keypresses during "Press your hotkey..." UI
+//! - Required because global-hotkey cannot detect unregistered combinations
+//! - **Platform status**:
+//!   - ✅ macOS: CGEventTap (617 lines, lock-free atomics)
+//!   - 🟡 Windows: TODO - Need WH_KEYBOARD_LL hooks
+//!   - 🟡 Linux: TODO - Need XRecordExtension/Wayland integration
+//!
+//! **See [`ARCHITECTURE.md`](../ARCHITECTURE.md) for detailed design rationale.**
+//!
+//! ## Usage
+//! ```rust,no_run
 //! use bevy::prelude::*;
 //! use ecs_hotkey::{HotkeyDefinition, HotkeyPlugin, HotkeyRegisterRequested};
-//! use global_hotkey::hotkey::{Code, Modifiers};
 //!
-//! fn main() {
-//!     App::new()
-//!         .add_plugins(HotkeyPlugin::default())
-//!         .add_systems(Startup, register_hotkeys)
-//!         .run();
-//! }
-//!
-//! fn register_hotkeys(mut events: EventWriter<HotkeyRegisterRequested>) {
-//!     let hotkey_def = HotkeyDefinition {
-//!         modifiers: Modifiers::META | Modifiers::SHIFT,
-//!         code: Code::Space,
-//!         description: "Cmd+Shift+Space".to_string(),
-//!     };
-//!
-//!     events.write(HotkeyRegisterRequested {
-//!         binding: HotkeyBinding::new(hotkey_def, "my_action"),
-//!         requester: "my_service".to_string(),
-//!     });
-//! }
+//! App::new()
+//!     .add_plugins(HotkeyPlugin::default())
+//!     .add_systems(Startup, register_hotkeys)
+//!     .run();
+//! # fn register_hotkeys() {}
 //! ```
 
 pub mod capture;
 pub mod components;
 pub mod conflict;
 pub mod events;
+pub mod feedback;
 pub mod platform;
 pub mod resources;
 pub mod systems;
+pub mod system_hotkeys;
 
 // Re-export main types for easy access
 use std::time::Duration;
@@ -50,9 +50,21 @@ pub use capture::*;
 pub use components::*;
 pub use conflict::*;
 pub use events::*;
+pub use feedback::*;
 pub use platform::*;
 pub use resources::*;
 pub use systems::*;
+pub use system_hotkeys::*;
+
+// Re-export configuration import/export
+pub use resources::{
+    export_config,
+    import_config,
+    merge_bindings,
+    ExportedConfig,
+    SerializableHotkeyBinding,
+    MergeStrategy,
+};
 
 /// Main ECS Hotkey Plugin
 ///
@@ -126,15 +138,86 @@ impl Plugin for HotkeyPlugin {
     fn build(&self, app: &mut App) {
         info!("Initializing ECS Hotkey Service Plugin");
 
-        // Initialize resources
-        app.insert_resource(HotkeyManager::new(
-            self.max_hotkeys,
-            self.enable_conflict_resolution,
-        ))
+        // Initialize resources with Wayland support on Linux
+        let hotkey_manager_opt: Option<HotkeyManager> = {
+            #[cfg(target_os = "linux")]
+            {
+                if crate::platform::is_wayland() {
+                    let compositor = crate::platform::detect_compositor();
+                    info!("Detected Wayland compositor: {:?}", compositor);
+
+                    match compositor {
+                        crate::platform::LinuxCompositor::Kde |
+                        crate::platform::LinuxCompositor::Hyprland => {
+                            // Try initializing Wayland backend
+                            let wayland_result = tokio::runtime::Runtime::new()
+                                .map_err(|e| format!("Failed to create tokio runtime: {}", e))
+                                .and_then(|rt| {
+                                    rt.block_on(async {
+                                        crate::platform::linux_wayland::WaylandHotkeyManager::new().await
+                                            .map_err(|e| format!("Wayland backend init failed: {}", e))
+                                    })
+                                });
+
+                            match wayland_result {
+                                Ok(wayland_mgr) => {
+                                    info!("✅ Wayland native hotkey support initialized");
+                                    match GlobalHotKeyManager::new() {
+                                        Ok(global_manager) => {
+                                            Some(HotkeyManager {
+                                                global_manager,
+                                                max_hotkeys: self.max_hotkeys,
+                                                enable_conflict_resolution: self.enable_conflict_resolution,
+                                                wayland_manager: Some(std::sync::Arc::new(tokio::sync::Mutex::new(wayland_mgr))),
+                                            })
+                                        }
+                                        Err(e) => {
+                                            error!("GlobalHotKeyManager creation failed: {}", e);
+                                            error!("Hotkey functionality will be disabled for this session");
+                                            None
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Wayland backend initialization failed: {}, falling back to X11", e);
+                                    HotkeyManager::new(self.max_hotkeys, self.enable_conflict_resolution).ok()
+                                }
+                            }
+                        }
+                        _ => {
+                            // Unsupported compositor - use X11 fallback
+                            info!("Compositor {:?} not supported for native Wayland hotkeys, using X11/XWayland", compositor);
+                            HotkeyManager::new(self.max_hotkeys, self.enable_conflict_resolution).ok()
+                        }
+                    }
+                } else {
+                    // X11 session on Linux
+                    HotkeyManager::new(self.max_hotkeys, self.enable_conflict_resolution).ok()
+                }
+            }
+
+            #[cfg(not(target_os = "linux"))]
+            {
+                HotkeyManager::new(self.max_hotkeys, self.enable_conflict_resolution).ok()
+            }
+        };
+
+        if let Some(hotkey_manager) = hotkey_manager_opt {
+            app.insert_resource(hotkey_manager);
+        } else {
+            error!("Failed to initialize HotkeyManager");
+            error!("Hotkey functionality will be disabled for this session");
+        }
+        
+        app
         .insert_resource(HotkeyRegistry::default())
         .insert_resource(HotkeyCaptureState::default())
+        .insert_resource(HotkeyCaptureUIState::default())
+        .insert_resource(MultiCaptureState::default())
         .insert_resource(HotkeyMetrics::default())
         .insert_resource(HotkeyPreferences::default())
+        .insert_resource(HotkeyAnalytics::default())
+        .insert_resource(HotkeyEntityMap::default())
         .insert_resource(HotkeyConfig {
             enable_debug_logging: self.enable_debug_logging,
             polling_interval: self.polling_interval,
@@ -147,24 +230,39 @@ impl Plugin for HotkeyPlugin {
             .add_event::<HotkeyRegisterCompleted>()
             .add_event::<HotkeyUnregisterRequested>()
             .add_event::<HotkeyUnregisterCompleted>()
-            .add_event::<HotkeyCaptureStarted>()
+            .add_event::<HotkeyCaptureRequested>()
             .add_event::<HotkeyCaptureCompleted>()
             .add_event::<HotkeyCaptureCancelled>()
             .add_event::<HotkeyPressed>()
             .add_event::<HotkeyConflictDetected>()
             .add_event::<HotkeyTestRequested>()
             .add_event::<HotkeyTestResult>()
-            .add_event::<HotkeyPreferencesUpdated>();
+            .add_event::<HotkeyPreferencesUpdated>()
+            .add_event::<HotkeyProfileSwitchRequested>()
+            .add_event::<HotkeyProfileSwitchCompleted>()
+            .add_event::<HotkeyProfileCreated>()
+            .add_event::<HotkeyProfileDeleted>()
+            .add_event::<HotkeyProfilesUpdated>()
+            .add_event::<HotkeyVisualFeedback>();
 
         // Add platform-specific startup systems
         #[cfg(target_os = "macos")]
         app.add_systems(Startup, crate::platform::macos::setup_macos_hotkey_system);
 
-        // Add core systems
+        // Add profile loading startup system
+        app.add_systems(Startup, load_hotkey_profiles_startup_system);
+
+        // Add core systems (split into multiple calls to avoid tuple size limit)
         app.add_systems(
             Update,
             (
+                // Profile management
+                (process_profile_switch_requests_system,).in_set(HotkeySystemSet::ProfileManagement),
+                (manage_hotkey_profiles_persistence_system,).in_set(HotkeySystemSet::ProfileManagement),
+                (poll_hotkey_profiles_persist_tasks,).in_set(HotkeySystemSet::ProfileManagement),
+                (poll_hotkey_profiles_load_tasks,).in_set(HotkeySystemSet::ProfileManagement),
                 // Hotkey management
+                #[cfg(not(target_os = "macos"))]
                 (process_hotkey_registration_requests_system,)
                     .in_set(HotkeySystemSet::Registration),
                 (process_hotkey_unregistration_requests_system,)
@@ -176,19 +274,33 @@ impl Plugin for HotkeyPlugin {
                 (crate::platform::macos::process_macos_hotkey_events_system,).in_set(HotkeySystemSet::Detection),
                 #[cfg(target_os = "macos")]
                 (crate::platform::macos::register_hotkey_with_macos_system,).in_set(HotkeySystemSet::Registration),
-                #[cfg(not(target_os = "macos"))]
-                (hotkey_polling_system,).in_set(HotkeySystemSet::Detection),
+                #[cfg(target_os = "linux")]
+                (poll_wayland_hotkey_events_system,).in_set(HotkeySystemSet::Detection),
                 (process_hotkey_pressed_events_system,).in_set(HotkeySystemSet::EventProcessing),
+                // Feedback systems
+                (spawn_hotkey_feedback_system,).in_set(HotkeySystemSet::EventProcessing),
+            ),
+        );
+        
+        // Add capture, testing, preferences, cleanup systems
+        app.add_systems(
+            Update,
+            (
                 // Real-time capture
                 (process_hotkey_capture_requests_system,).in_set(HotkeySystemSet::Capture),
-                // Temporarily disable real_hotkey_capture_system due to Optional EventWriter issue
-                // real_hotkey_capture_system.in_set(HotkeySystemSet::Capture),
+                (real_hotkey_capture_system,).in_set(HotkeySystemSet::Capture),
+                // Multi-session capture
+                (process_multi_capture_requests_system,).in_set(HotkeySystemSet::Capture),
+                (multi_session_capture_system,).in_set(HotkeySystemSet::Capture),
+                (process_multi_capture_cancellations_system,).in_set(HotkeySystemSet::Capture),
                 // Testing and preferences
                 (process_hotkey_test_requests_system,).in_set(HotkeySystemSet::Testing),
                 (manage_hotkey_preferences_system,).in_set(HotkeySystemSet::Preferences),
                 (poll_hotkey_preferences_persist_tasks,).in_set(HotkeySystemSet::Preferences),
                 // Cleanup and metrics
+                (cleanup_despawned_hotkey_guards_system,).in_set(HotkeySystemSet::Cleanup),
                 (cleanup_completed_hotkey_operations_system,).in_set(HotkeySystemSet::Cleanup),
+                (cleanup_feedback_ui_system,).in_set(HotkeySystemSet::Cleanup),
                 (update_hotkey_metrics_system,).in_set(HotkeySystemSet::Metrics),
             ),
         );
@@ -197,6 +309,7 @@ impl Plugin for HotkeyPlugin {
         app.configure_sets(
             Update,
             (
+                HotkeySystemSet::ProfileManagement,
                 HotkeySystemSet::Registration,
                 HotkeySystemSet::ConflictDetection,
                 HotkeySystemSet::Detection,
@@ -224,6 +337,8 @@ impl Plugin for HotkeyPlugin {
 /// System sets for organizing hotkey-related systems
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum HotkeySystemSet {
+    /// Profile management and switching
+    ProfileManagement,
     /// Hotkey registration and unregistration processing
     Registration,
     /// Conflict detection and validation

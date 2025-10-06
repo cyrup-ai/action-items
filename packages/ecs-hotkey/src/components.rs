@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use bevy::tasks::Task;
 
 use crate::events::HotkeyDefinition;
-use crate::resources::{HotkeyId, HotkeyPreferences};
+use crate::resources::{HotkeyId, HotkeyPreferences, HotkeyProfiles};
 
 /// Component to track hotkey operation state
 #[derive(Component)]
@@ -23,14 +23,6 @@ pub struct HotkeyOperation {
     pub completed_at: Option<Instant>,
 }
 
-/// Component to track hotkey polling task
-/// Extracted from production hotkey_setup.rs
-#[derive(Component)]
-#[allow(dead_code)]
-pub struct HotkeyPollingTask {
-    pub task: Task<()>,
-}
-
 /// Marker component for the hotkey manager entity
 /// Extracted from production hotkey_setup.rs
 #[derive(Component)]
@@ -39,7 +31,6 @@ pub struct HotkeyManagerEntity;
 /// Component to track hotkey preferences persistence task
 /// Extracted from production preferences.rs
 #[derive(Component)]
-#[allow(dead_code)]
 pub struct HotkeyPreferencesPersistTask {
     pub task: Task<Result<PathBuf, Box<dyn std::error::Error + Send + Sync>>>,
 }
@@ -47,7 +38,6 @@ pub struct HotkeyPreferencesPersistTask {
 /// Component to track hotkey preferences loading task
 /// Extracted from production preferences.rs
 #[derive(Component)]
-#[allow(dead_code)]
 pub struct HotkeyPreferencesLoadTask {
     pub task: Task<HotkeyPreferences>,
 }
@@ -101,4 +91,33 @@ impl HotkeyUsageTracker {
         self.usage_count += 1;
         self.last_used = Some(now);
     }
+}
+
+/// Component to track hotkey profiles persistence task
+#[derive(Component)]
+pub struct HotkeyProfilesPersistTask {
+    pub task: Task<Result<PathBuf, Box<dyn std::error::Error + Send + Sync>>>,
+}
+
+/// Component to track hotkey profiles loading task
+#[derive(Component)]
+pub struct HotkeyProfilesLoadTask {
+    pub task: Task<HotkeyProfiles>,
+}
+
+/// Component that automatically unregisters hotkey when entity despawns
+/// 
+/// Attach this component to entities that register hotkeys to ensure
+/// automatic cleanup when the entity is despawned.
+/// 
+/// # Example
+/// ```rust
+/// commands.spawn((
+///     HotkeyGuard { hotkey_id },
+///     Name::new("MyFeature-Hotkey"),
+/// ));
+/// ```
+#[derive(Component)]
+pub struct HotkeyGuard {
+    pub hotkey_id: HotkeyId,
 }

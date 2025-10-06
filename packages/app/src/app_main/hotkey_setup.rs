@@ -74,7 +74,7 @@ pub fn setup_global_hotkey_callback(
     let event_proxy = event_loop_proxy.clone();
     
     // Register the actual hotkey using the HotkeyManager from ECS
-    let (registered_hotkey, hotkey_description) = match ecs_hotkey::conflict::register_launcher_hotkey(&mut hotkey_manager) {
+    let (registered_hotkey, hotkey_description) = match ecs_hotkey::conflict::register_launcher_hotkey(&mut hotkey_manager, &hotkey_prefs) {
         Ok((hotkey, description)) => {
             info!("Successfully registered hotkey: {}", description);
             (hotkey, description)

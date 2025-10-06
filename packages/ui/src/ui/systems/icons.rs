@@ -5,7 +5,8 @@
 use bevy::prelude::*;
 
 use crate::ui::components::{FallbackIcon, ImageComponent, ResultIcon};
-use crate::ui::icons::{LauncherIconCache, IconExtractionQueue, IconTheme};
+use crate::ui::icons::LauncherIconCache;
+use action_items_ecs_ui::icons::IconTheme;
 
 /// Initialize icon extraction and cache systems
 /// Zero-allocation icon system initialization with blazing-fast cache setup
@@ -14,16 +15,11 @@ pub fn initialize_icon_system_system(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     icon_cache: Option<Res<LauncherIconCache>>,
-    icon_extraction: Option<Res<IconExtractionQueue>>,
     icon_theme: Option<Res<IconTheme>>,
 ) {
     // Initialize icon-related resources if not already done
     if icon_cache.is_none() {
         commands.insert_resource(LauncherIconCache::new());
-    }
-
-    if icon_extraction.is_none() {
-        commands.init_resource::<IconExtractionQueue>();
     }
 
     if icon_theme.is_none() {

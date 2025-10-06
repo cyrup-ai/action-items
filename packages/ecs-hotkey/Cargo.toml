@@ -15,8 +15,7 @@ uuid = { workspace = true, features = ["v4", "serde"] }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 dirs = "6"
-tokio = { workspace = true, features = ["rt", "macros", "time"] }
-crossbeam-channel = "0.5"
+once_cell = "1.20"
 
 # Platform-specific dependencies
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -25,6 +24,13 @@ accessibility-sys = "0.2"
 objc2 = "0.6"
 objc2-core-foundation = "0.3"
 objc2-core-graphics = "0.3"
+dashmap = "6.1"
+once_cell = "1.20"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "4", default-features = false, features = ["tokio"] }
+async-trait = "0.1"
+futures-util = "0.3"
 
 # Re-enable warnings for this workspace package
 [lints]

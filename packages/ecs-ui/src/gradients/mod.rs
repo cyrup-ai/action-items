@@ -42,7 +42,7 @@ pub mod theme;
 
 // Re-export main types for convenience
 pub use components::GradientComponent;
-pub use interactive::InteractiveGradient;
+pub use interactive::{InteractiveGradient, InteractiveGradientTransition};
 pub use plugin::GradientPlugin;
 pub use states::{GradientComponentType, GradientInteractionState};
 pub use systems::*;

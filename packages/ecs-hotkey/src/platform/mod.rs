@@ -6,9 +6,19 @@ pub mod linux;
 pub mod macos;
 pub mod windows;
 
+#[cfg(target_os = "linux")]
+pub mod linux_wayland;
+#[cfg(target_os = "linux")]
+pub mod linux_wayland_kde;
+#[cfg(target_os = "linux")]
+pub mod linux_wayland_portal;
+
 pub use linux::*;
 pub use macos::*;
 pub use windows::*;
+
+#[cfg(target_os = "linux")]
+pub use linux_wayland::*;
 
 /// Platform-specific hotkey initialization
 pub fn init_platform_hotkeys() -> Result<(), String> {

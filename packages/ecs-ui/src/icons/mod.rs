@@ -1,26 +1,14 @@
 //! Core icon type system for Bevy applications
-//!
-//! Provides foundational types for icon management including:
-//! - Icon sizing standards
-//! - Universal icon type categories
-//! - Cross-platform theme detection
-//! - Icon caching infrastructure
-//! - Async icon extraction from OS
-//!
-//! # Modules
-//! - [`types`] - IconSize, IconType enums
-//! - [`theme`] - ThemeColors, IconTheme resources
-//! - [`cache`] - IconCache resource for loaded icons
-//! - [`components`] - IconInteractionState, IconAnimation components
-//! - [`events`] - Icon extraction and state change events
-//! - [`extraction`] - Async icon extraction systems
 
 pub mod types;
 pub mod theme;
 pub mod cache;
 pub mod components;
 pub mod events;
+pub mod fontawesome;
 pub mod extraction;
+pub mod systems;
+pub mod plugin;
 
 // Re-export public types
 pub use types::{IconSize, IconType};
@@ -36,9 +24,20 @@ pub use events::{
     IconAnimationCompleteEvent,
     IconAnimationType,
 };
+pub use fontawesome::{FontAwesome, IconDetection, IconFallback};
 pub use extraction::{
     IconExtractionInProgress,
     process_icon_extraction_requests,
     poll_icon_extraction_tasks,
     process_icon_extraction_results,
 };
+pub use systems::{
+    apply_icon_system,
+    interactive_icon_system,
+    animate_icon_transitions_system,
+    handle_icon_color_change_events,
+    handle_icon_size_change_events,
+    optimize_icon_performance_system,
+    validate_icon_cache_system,
+};
+pub use plugin::IconPlugin;

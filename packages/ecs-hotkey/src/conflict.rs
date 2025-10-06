@@ -13,9 +13,10 @@ use crate::resources::{ConflictReport, ConflictType, HotkeyManager, HotkeyPrefer
 /// Extracted from production management.rs
 pub fn register_launcher_hotkey(
     manager: &mut HotkeyManager,
+    preferences: &HotkeyPreferences,
 ) -> Result<(HotKey, String), Box<dyn std::error::Error>> {
     // Use HotkeyPreferences to determine if auto_fallback should be used
-    let hotkey_prefs = &manager.preferences;
+    let hotkey_prefs = preferences;
     // Use preferred_combinations from HotkeyPreferences (implements preferred_combinations field
     // usage)
     let preferred_combinations = &hotkey_prefs.preferred_combinations;

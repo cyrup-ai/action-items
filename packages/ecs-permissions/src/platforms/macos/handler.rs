@@ -28,6 +28,12 @@ unsafe extern "C" {
 /// macOS-specific permission handler
 pub struct MacOSHandler;
 
+impl Default for MacOSHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MacOSHandler {
     pub fn new() -> Self {
         Self

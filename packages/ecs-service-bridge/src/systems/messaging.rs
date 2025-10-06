@@ -15,7 +15,6 @@ use crate::events::{MessagePriority, *};
 use crate::messaging::*;
 use crate::resources::*;
 use crate::types::{MessageAddress, ServiceError, ServiceResult, TimeStamp};
-use action_items_ecs_compression::{CompressionManager, CompressionAlgorithm};
 
 /// Type alias for message deduplication state storage
 type DedupState = OnceLock<Mutex<(HashSet<u64>, BTreeMap<u64, f64>)>>;
@@ -933,61 +932,9 @@ fn apply_message_transformation(envelope: &mut MessageEnvelope) -> bool {
     let mut transformation_applied = false;
 
     // 1. Compression for large payloads
-    const COMPRESSION_THRESHOLD: u32 = 8192; // 8KB threshold
-
-    // DISABLED: Compression temporarily disabled until pure Rust implementation is complete
-    if false && envelope.metadata.content_length > COMPRESSION_THRESHOLD {
-        // Use ECS compression service - DISABLED until implementation is fixed
-        // use action_items_ecs_compression::{CompressionAlgorithm, CompressionManager};
-
-        let original_data = match serde_json::to_vec(&envelope.payload.content) {
-            Ok(data) => data,
-            Err(e) => {
-                error!("JSON serialization failed: {}", e);
-                return false; // Skip compression on serialization error
-            },
-        };
-        let original_size = original_data.len() as u32;
-
-        // Create a temporary compression manager for this operation
-        let compression_manager = CompressionManager::new(Default::default());
-
-        match compression_manager.compress_sync(original_data) {
-            Ok(compressed) => {
-                let compressed_size = compressed.data.len() as u32;
-                envelope.metadata.content_length = compressed_size;
-
-                // Store compressed data and update metadata
-                use base64::Engine as _;
-                use base64::engine::general_purpose;
-                envelope.payload.content =
-                    serde_json::Value::String(general_purpose::STANDARD.encode(&compressed.data));
-                envelope.payload.content_type = match compressed.algorithm {
-                    CompressionAlgorithm::Lz4 => "application/json+lz4",
-                    CompressionAlgorithm::Brotli => "application/json+brotli",
-                    CompressionAlgorithm::Snappy => "application/json+snappy",
-                    CompressionAlgorithm::Gzip => "application/json+gzip",
-                    CompressionAlgorithm::Deflate => "application/json+deflate",
-                    CompressionAlgorithm::Zstd => "application/json+zstd",
-                }
-                .to_string();
-
-                debug!(
-                    "Compressed message using {:?}: {} -> {} bytes ({:.1}% reduction)",
-                    compressed.algorithm,
-                    original_size,
-                    compressed_size,
-                    compressed.compression_ratio * 100.0
-                );
-            },
-            Err(e) => {
-                error!("ECS compression failed: {}", e);
-                return false; // Skip compression on error
-            },
-        }
-
-        transformation_applied = true;
-    }
+    // NOTE: Compression temporarily disabled until pure Rust implementation is complete
+    // TODO: Re-enable compression when action_items_ecs_compression is fully implemented
+    // const COMPRESSION_THRESHOLD: u32 = 8192; // 8KB threshold
 
     // 2. Format optimization based on content type
     match envelope.metadata.message_type.as_str() {

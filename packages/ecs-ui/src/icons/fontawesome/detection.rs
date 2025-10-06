@@ -1,6 +1,6 @@
 //! Icon type detection utilities for intelligent type inference
 
-use crate::ui::icons::IconType;
+use crate::icons::types::IconType;
 
 /// Icon detection utilities for intelligent type inference
 pub struct IconDetection;

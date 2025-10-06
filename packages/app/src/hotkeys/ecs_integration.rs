@@ -26,9 +26,6 @@ pub fn register_launcher_hotkey_system(mut hotkey_events: EventWriter<HotkeyRegi
 
         hotkey_events.write(HotkeyRegisterRequested {
             binding,
-            requester: "action_items_launcher".to_string(),
-            action: "launcher_toggle".to_string(),
-            definition: primary_hotkey.clone(),
         });
 
         info!(

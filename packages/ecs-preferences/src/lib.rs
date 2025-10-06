@@ -9,12 +9,10 @@
 //! use bevy::prelude::*;
 //! use action_items_ecs_preferences::*;
 //!
-//! fn main() {
-//!     App::new()
-//!         .add_plugins(PreferencesPlugin)  // Core (headless)
-//!         .add_plugins(PreferencesUIPlugin)  // UI (optional)
-//!         .run();
-//! }
+//! App::new()
+//!     .add_plugins(PreferencesPlugin)  // Core (headless)
+//!     .add_plugins(PreferencesUIPlugin)  // UI (optional)
+//!     .run();
 //! ```
 
 pub mod events;

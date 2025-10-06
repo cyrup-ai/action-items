@@ -211,11 +211,6 @@ pub fn add_update_systems(app: &mut App) {
                 handle_launcher_events,
             )
                 .chain(),
-            // UI interaction systems - can run in parallel
-            (
-                action_items_ui::prelude::handle_result_item_hover_system,
-                action_items_ui::prelude::handle_keyboard_selection_highlighting_system,
-            ),
             // Focus-aware styling systems - run after focus changes
             (
                 apply_text_input_focus_styling_system,
