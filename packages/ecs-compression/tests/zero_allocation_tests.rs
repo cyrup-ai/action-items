@@ -5,12 +5,11 @@
 //! may have internal allocations for state management.
 
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use action_items_ecs_compression::manager::{CompressionManager, PooledBuffer};
 use action_items_ecs_compression::types::{
-    CompressionAlgorithm, CompressionConfig, CompressionError,
+    CompressionAlgorithm, CompressionConfig,
 };
 
 /// Custom allocator that tracks allocation counts
@@ -82,7 +81,7 @@ impl AllocationStats {
         self.allocations as isize - self.deallocations as isize
     }
 
-    fn net_bytes(&self) -> isize {
+    fn _net_bytes(&self) -> isize {
         self.bytes_allocated as isize - self.bytes_deallocated as isize
     }
 }
@@ -356,7 +355,7 @@ fn test_pooled_buffer_drop_behavior() {
 
     {
         let stats_before = TRACKING_ALLOCATOR.get_stats();
-        let buffer = PooledBuffer::acquire();
+        let _buffer = PooledBuffer::acquire();
         let stats_after_acquire = TRACKING_ALLOCATOR.get_stats();
 
         // Buffer acquisition should have minimal allocations (from pool)

@@ -13,6 +13,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
+opener = "0.7"
+urlencoding = "2.1"
 
 [lib]
 name = "action_items_ecs_settings"

@@ -5,6 +5,7 @@
 
 #![allow(dead_code)]
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -594,14 +595,20 @@ pub fn handle_wizard_permission_requests(
     }
 }
 
+/// SystemParam grouping wizard event writers to reduce function parameter count
+#[derive(SystemParam)]
+pub struct WizardEventWriters<'w> {
+    wizard_status_changed: EventWriter<'w, WizardPermissionStatusChanged>,
+    permission_set_responses: EventWriter<'w, PermissionSetResponse>,
+    batch_status_updates: EventWriter<'w, PermissionBatchStatusUpdate>,
+    wizard_step_complete: EventWriter<'w, WizardStepComplete>,
+}
+
 /// System to monitor ecs-permissions events and update wizard state with real-time updates
 pub fn monitor_ecs_permission_events(
     mut permission_changed_events: EventReader<PermissionChanged>,
     mut permission_error_events: EventReader<PermissionRequestError>,
-    mut wizard_status_changed_events: EventWriter<WizardPermissionStatusChanged>,
-    mut permission_set_responses: EventWriter<PermissionSetResponse>,
-    mut batch_status_updates: EventWriter<PermissionBatchStatusUpdate>,
-    mut wizard_step_complete_events: EventWriter<WizardStepComplete>,
+    mut events: WizardEventWriters,
     mut wizard_permission_manager: ResMut<WizardPermissionManager>,
     mut commands: Commands,
 ) {
@@ -620,7 +627,7 @@ pub fn monitor_ecs_permission_events(
         status_updates.insert(event.typ, wizard_status);
         
         // Send wizard-specific status change event
-        wizard_status_changed_events.write(WizardPermissionStatusChanged {
+        events.wizard_status_changed.write(WizardPermissionStatusChanged {
             permission_type: event.typ,
             previous_status,
             new_status: wizard_status,
@@ -640,7 +647,7 @@ pub fn monitor_ecs_permission_events(
                     PermissionSetResponse::partial(request_id, state.granted_permissions, state.denied_permissions)
                 }.with_wizard_shown();
                 
-                permission_set_responses.write(response);
+                events.permission_set_responses.write(response);
             }
         }
         
@@ -666,7 +673,7 @@ pub fn monitor_ecs_permission_events(
         
         status_updates.insert(event.typ, wizard_status);
         
-        wizard_status_changed_events.write(WizardPermissionStatusChanged {
+        events.wizard_status_changed.write(WizardPermissionStatusChanged {
             permission_type: event.typ,
             previous_status,
             new_status: wizard_status,
@@ -690,7 +697,7 @@ pub fn monitor_ecs_permission_events(
         
         if all_required_granted {
             info!("All required permissions granted - triggering wizard step completion");
-            wizard_step_complete_events.write(WizardStepComplete {
+            events.wizard_step_complete.write(WizardStepComplete {
                 completed_state: WizardState::CheckingPermissions,
                 next_state: WizardState::SettingUpHotkeys,
                 auto_advance: true,
@@ -698,7 +705,7 @@ pub fn monitor_ecs_permission_events(
         }
         
         // Send batch status update if any changes occurred
-        batch_status_updates.write(PermissionBatchStatusUpdate::new(
+        events.batch_status_updates.write(PermissionBatchStatusUpdate::new(
             status_updates,
             BatchUpdateSource::SystemNotification,
         ));

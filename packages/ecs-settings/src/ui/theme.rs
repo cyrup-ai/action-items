@@ -36,3 +36,18 @@ pub const SECTION_SPACING: f32 = 20.0;
 pub const LABEL_WIDTH_PCT: f32 = 45.0;
 pub const CONTROL_WIDTH_PCT: f32 = 50.0;
 pub const CONTROL_OFFSET_PCT: f32 = 48.0;
+
+// Account tab specific colors
+pub const PRO_BADGE_BG: Color = Color::srgba(0.20, 0.45, 0.75, 0.25);
+pub const PRO_BADGE_TEXT: Color = Color::srgba(0.40, 0.70, 1.0, 1.0);
+pub const PROFILE_PHOTO_BG: Color = Color::srgba(0.15, 0.15, 0.18, 1.0);
+pub const PROFILE_BORDER: Color = Color::srgba(0.30, 0.60, 0.90, 1.0);
+pub const DESTRUCTIVE_BUTTON: Color = Color::srgba(0.85, 0.25, 0.25, 1.0);
+pub const STATUS_BOX_BG: Color = Color::srgba(0.12, 0.12, 0.14, 1.0);
+
+// Organizations tab colors
+pub const ORG_BADGE_GREEN_BG: Color = Color::srgba(0.2, 0.8, 0.4, 0.25);  // Semi-transparent green
+pub const ORG_BADGE_GREEN_TEXT: Color = Color::srgba(0.3, 1.0, 0.5, 1.0);  // Bright green
+pub const ORG_LOGO_BG: Color = Color::srgba(0.15, 0.15, 0.18, 1.0);  // Darker than CARD_BG
+pub const ORG_LOGO_BORDER: Color = Color::srgba(0.30, 0.60, 0.90, 1.0);  // Blue ring (matches BUTTON_PRIMARY)
+pub const DANGER_BORDER: Color = Color::srgba(1.0, 0.3, 0.3, 1.0);  // Red for danger zone

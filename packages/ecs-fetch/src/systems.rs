@@ -5,6 +5,7 @@
 
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task};
 use bytes::Bytes;
@@ -23,34 +24,53 @@ use crate::resources::*;
 use crate::security::sanitization::{RequestSanitizer, ResponseSanitizer};
 use crate::security::{ComprehensiveRequestValidator, RequestSecurityContext};
 
+/// SystemParam grouping HTTP request event readers to reduce function parameter count
+#[derive(SystemParam)]
+pub struct HttpRequestEvents<'w, 's> {
+    request_events: EventReader<'w, 's, HttpRequestSubmitted>,
+}
+
+/// SystemParam grouping HTTP response event writers to reduce function parameter count
+#[derive(SystemParam)]
+pub struct HttpResponseEvents<'w> {
+    response_events: EventWriter<'w, HttpResponseReceived>,
+    failure_events: EventWriter<'w, HttpRequestFailed>,
+    rate_limit_events: EventWriter<'w, RateLimitExceeded>,
+    cache_read_events: EventWriter<'w, HttpCacheReadRequested>,
+    cache_write_events: EventWriter<'w, HttpCacheWriteRequested>,
+}
+
+/// SystemParam grouping HTTP resources to reduce function parameter count
+#[derive(SystemParam)]
+pub struct HttpResources<'w> {
+    client_pool: ResMut<'w, HttpClientPool>,
+    rate_limiter: ResMut<'w, RateLimitManager>,
+    config: Res<'w, HttpConfig>,
+    cache_config: Res<'w, CacheIntegrationConfig>,
+    cache_integration: ResMut<'w, HttpCacheManager>,
+}
+
 /// System to process incoming HTTP requests with comprehensive security validation
 #[instrument(skip_all, fields(requests_processed))]
 pub fn process_http_requests_system(
     mut commands: Commands,
-    mut client_pool: ResMut<HttpClientPool>,
-    mut rate_limiter: ResMut<RateLimitManager>,
-    mut metrics: ResMut<RequestMetrics>,
-    config: Res<HttpConfig>,
-    cache_config: Res<CacheIntegrationConfig>,
-    mut request_events: EventReader<HttpRequestSubmitted>,
-    mut response_events: EventWriter<HttpResponseReceived>,
-    mut failure_events: EventWriter<HttpRequestFailed>,
-    mut rate_limit_events: EventWriter<RateLimitExceeded>,
-    mut cache_read_events: EventWriter<HttpCacheReadRequested>,
-    mut cache_integration: ResMut<HttpCacheManager>,
-) {
+    mut resources: HttpResources,
+    _metrics: ResMut<RequestMetrics>,
+    mut req_events: HttpRequestEvents,
+    mut resp_events: HttpResponseEvents,
+){
     let mut requests_processed = 0u32;
-    let request_sanitizer = RequestSanitizer::default();
+    let _request_sanitizer = RequestSanitizer::default();
     let validator = ComprehensiveRequestValidator::default();
 
-    for request in request_events.read() {
+    for request in req_events.request_events.read() {
         requests_processed += 1;
 
         // Parse and validate URL
         let parsed_url = match url::Url::parse(&request.url) {
             Ok(url) => url,
             Err(e) => {
-                failure_events.write(HttpRequestFailed {
+                resp_events.failure_events.write(HttpRequestFailed {
                     operation_id: request.operation_id,
                     correlation_id: request.correlation_id,
                     error: HttpErrorKind::InvalidUrl(e.to_string()),
@@ -68,19 +88,19 @@ pub fn process_http_requests_system(
         let domain = parsed_url.domain().unwrap_or("unknown").to_string();
 
         // Check rate limits
-        match rate_limiter.check_rate_limit(&domain) {
+        match resources.rate_limiter.check_rate_limit(&domain) {
             Ok(_) => {},
             Err(_) => {
-                rate_limit_events.write(RateLimitExceeded {
+                resp_events.rate_limit_events.write(RateLimitExceeded {
                     domain: domain.clone(),
                     retry_after: Some(Duration::from_secs(60)),
-                    current_rate: rate_limiter.get_current_rate(&domain),
-                    limit: config.rate_limit_config.per_domain_requests_per_second as f64,
-                    queued_requests: rate_limiter.get_queued_count(&domain) as u32,
+                    current_rate: resources.rate_limiter.get_current_rate(&domain),
+                    limit: resources.config.rate_limit_config.per_domain_requests_per_second as f64,
+                    queued_requests: resources.rate_limiter.get_queued_count(&domain) as u32,
                     occurred_at: Instant::now(),
                 });
 
-                failure_events.write(HttpRequestFailed {
+                resp_events.failure_events.write(HttpRequestFailed {
                     operation_id: request.operation_id,
                     correlation_id: request.correlation_id,
                     error: HttpErrorKind::RateLimit,
@@ -104,7 +124,7 @@ pub fn process_http_requests_system(
         );
 
         if let Err(security_error) = validator.validate_request(&security_context) {
-            failure_events.write(HttpRequestFailed {
+            resp_events.failure_events.write(HttpRequestFailed {
                 operation_id: request.operation_id,
                 correlation_id: request.correlation_id,
                 error: HttpErrorKind::SecurityViolation(security_error.to_string()),
@@ -119,7 +139,7 @@ pub fn process_http_requests_system(
 
         // Start cache lookup if enabled
         if request.cache_policy.enabled {
-            let cache_key = cache_integration.generate_cache_key(
+            let cache_key = resources.cache_integration.generate_cache_key(
                 &request.method,
                 &request.url,
                 Some(&request.headers),
@@ -127,12 +147,12 @@ pub fn process_http_requests_system(
             );
 
             // Start async cache read - results handled by cache completion systems
-            cache_integration.start_cache_read(
+            resources.cache_integration.start_cache_read(
                 cache_key,
                 request.operation_id,
                 Some(request.correlation_id),
-                &cache_config,
-                &mut cache_read_events,
+                &resources.cache_config,
+                &mut resp_events.cache_read_events,
             );
 
             debug!(
@@ -143,7 +163,7 @@ pub fn process_http_requests_system(
         }
 
         // Get HTTP client from pool
-        let client = client_pool.get_client();
+        let client = resources.client_pool.get_client();
 
         // Clone necessary data for the async task
         let operation_id = request.operation_id;
@@ -153,8 +173,8 @@ pub fn process_http_requests_system(
         let headers = request.headers.clone();
         let body = request.body.clone();
         let timeout = request.timeout;
-        let requester = request.requester.clone();
-        let submitted_at = request.submitted_at;
+        let _requester = request.requester.clone();
+        let _submitted_at = request.submitted_at;
 
         // Spawn async task
         let task_pool = AsyncComputeTaskPool::get();
@@ -210,13 +230,11 @@ pub struct HttpRequestTask {
 #[instrument(skip_all, fields(responses_processed))]
 pub fn process_http_responses_system(
     mut commands: Commands,
-    mut metrics: ResMut<RequestMetrics>,
+    metrics: ResMut<RequestMetrics>,
     mut request_query: Query<(Entity, &mut HttpRequest, &mut HttpRequestTask), With<HttpRequest>>,
-    mut response_events: EventWriter<HttpResponseReceived>,
-    mut failure_events: EventWriter<HttpRequestFailed>,
-    mut cache_write_events: EventWriter<HttpCacheWriteRequested>,
+    mut events: HttpResponseEvents,
     cache_config: Res<CacheIntegrationConfig>,
-    mut cache_integration: ResMut<HttpCacheManager>,
+    cache_integration: ResMut<HttpCacheManager>,
 ) {
     let mut responses_processed = 0u32;
     let response_sanitizer = ResponseSanitizer::default();
@@ -277,7 +295,7 @@ pub fn process_http_responses_system(
                                         cache_key,
                                         cached_response,
                                         &cache_config,
-                                        &mut cache_write_events,
+                                        &mut events.cache_write_events,
                                     );
 
                                     debug!(
@@ -329,7 +347,7 @@ pub fn process_http_responses_system(
                         };
 
                         // Send response event
-                        response_events.write(HttpResponseReceived {
+                        events.response_events.write(HttpResponseReceived {
                             operation_id: request.operation_id,
                             correlation_id: request.correlation_id,
                             status: success.status,
@@ -361,7 +379,7 @@ pub fn process_http_responses_system(
                         metrics.record_failure(&domain, error.response_time);
 
                         // Send failure event
-                        failure_events.write(HttpRequestFailed {
+                        events.failure_events.write(HttpRequestFailed {
                             operation_id: request.operation_id,
                             correlation_id: request.correlation_id,
                             error: error.kind.clone(),
@@ -451,9 +469,9 @@ pub fn request_retry_system(
 
 /// Component for tracking delayed retries
 #[derive(Component, Debug, Clone)]
-struct DelayedRetry {
-    retry_request: HttpRequestRetryRequested,
-    ready_at: Instant,
+pub struct DelayedRetry {
+    pub retry_request: HttpRequestRetryRequested,
+    pub ready_at: Instant,
 }
 
 /// System to check delayed retries and resubmit when ready
@@ -487,8 +505,8 @@ pub fn delayed_retry_system(
 #[instrument(skip_all, fields(rate_limit_checks))]
 pub fn rate_limiting_system(
     mut rate_limiter: ResMut<RateLimitManager>,
-    mut rate_limit_events: EventWriter<RateLimitExceeded>,
-    time: Res<Time>,
+    _rate_limit_events: EventWriter<RateLimitExceeded>,
+    _time: Res<Time>,
 ) {
     // Rate limiting is handled in the request processing system
     // This system performs periodic cleanup and recovery notifications
@@ -517,7 +535,7 @@ pub fn rate_limiting_system(
 pub fn request_timeout_system(
     mut commands: Commands,
     mut timeout_query: Query<(Entity, &mut RequestTimeout, &HttpRequest), With<RequestTimeout>>,
-    mut failure_events: EventWriter<HttpRequestFailed>,
+    mut events: HttpResponseEvents,
 ) {
     let mut timeouts_processed = 0u32;
 
@@ -526,7 +544,7 @@ pub fn request_timeout_system(
             timeouts_processed += 1;
             timeout.mark_escalation_sent();
 
-            failure_events.write(HttpRequestFailed {
+            events.failure_events.write(HttpRequestFailed {
                 operation_id: request.operation_id,
                 correlation_id: request.correlation_id,
                 error: HttpErrorKind::Timeout,
@@ -715,7 +733,7 @@ pub fn cleanup_stale_requests_system(
     // Clean up request entities that no longer have active tasks
     // Limit cleanup batch size based on configuration
     for (index, entity) in stale_query.iter().enumerate() {
-        if index >= max_cleanup_batch as usize {
+        if index >= max_cleanup_batch {
             debug!(
                 "Cleanup batch limit reached: {}, deferring remaining entities",
                 max_cleanup_batch

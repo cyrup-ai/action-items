@@ -20,17 +20,17 @@ pub fn process_search_requests(
         tracing::debug!("Processing search request: {}", event.query);
 
         // Check cache first if enabled
-        if resource.config.enable_cache {
-            if let Some(cached) = resource.get_cached(&event.query) {
-                tracing::debug!("Returning cached results for: {}", event.query);
-                completed_events.write(SearchCompleted::new(
-                    event.query.clone(),
-                    cached.clone(),
-                    0,
-                    event.requester.clone(),
-                ));
-                continue;
-            }
+        if resource.config.enable_cache
+            && let Some(cached) = resource.get_cached(&event.query)
+        {
+            tracing::debug!("Returning cached results for: {}", event.query);
+            completed_events.write(SearchCompleted::new(
+                event.query.clone(),
+                cached.clone(),
+                0,
+                event.requester.clone(),
+            ));
+            continue;
         }
 
         // Update current query

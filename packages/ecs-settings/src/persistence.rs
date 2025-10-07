@@ -8,6 +8,9 @@ use action_items_ecs_user_settings::*;
 use uuid::Uuid;
 use crate::ui::components::*;
 
+// Type aliases for complex query types to improve readability and satisfy clippy
+type DropdownQuery<'w, 's> = Query<'w, 's, (&'static SettingControl, &'static mut DropdownControl), (Without<SettingCheckbox>, Without<TextInput>)>;
+
 /// Resource to track persistence requester entity
 #[derive(Resource)]
 pub struct PersistenceRequester(pub Entity);
@@ -58,7 +61,7 @@ pub fn apply_loaded_settings(
     mut events: EventReader<SettingsReadCompleted>,
     mut checkboxes: Query<(&SettingControl, &mut SettingCheckbox)>,
     mut text_inputs: Query<(&SettingControl, &mut TextInput), Without<SettingCheckbox>>,
-    mut dropdowns: Query<(&SettingControl, &mut DropdownControl), (Without<SettingCheckbox>, Without<TextInput>)>,
+    mut dropdowns: DropdownQuery,
 ) {
     for event in events.read() {
         // Handle database errors
@@ -92,47 +95,45 @@ pub fn apply_loaded_settings(
 
         // Apply to checkboxes
         for (control, mut checkbox) in checkboxes.iter_mut() {
-            if control.table == event.table {
-                if let Some(field_value) = obj.get(&control.field_name) {
-                    if let Some(bool_val) = field_value.as_bool() {
-                        checkbox.checked = bool_val;
-                        debug!("Loaded checkbox {}.{} = {}", control.table, control.field_name, bool_val);
-                    }
-                }
+            if control.table == event.table
+                && let Some(field_value) = obj.get(&control.field_name)
+                && let Some(bool_val) = field_value.as_bool()
+            {
+                checkbox.checked = bool_val;
+                debug!("Loaded checkbox {}.{} = {}", control.table, control.field_name, bool_val);
             }
         }
 
         // Apply to text inputs
         for (control, mut text_input) in text_inputs.iter_mut() {
-            if control.table == event.table {
-                if let Some(field_value) = obj.get(&control.field_name) {
-                    if let Some(str_val) = field_value.as_str() {
-                        text_input.value = str_val.to_string();
-                        debug!("Loaded text input {}.{} = {}", control.table, control.field_name, str_val);
-                    }
-                }
+            if control.table == event.table
+                && let Some(field_value) = obj.get(&control.field_name)
+                && let Some(str_val) = field_value.as_str()
+            {
+                text_input.value = str_val.to_string();
+                debug!("Loaded text input {}.{} = {}", control.table, control.field_name, str_val);
             }
         }
 
         // Apply to dropdowns
         for (control, mut dropdown) in dropdowns.iter_mut() {
-            if control.table == event.table {
-                if let Some(field_value) = obj.get(&control.field_name) {
-                    // Handle both string values (option name) and numeric values (index)
-                    if let Some(str_val) = field_value.as_str() {
-                        // Find index of option matching the string value
-                        if let Some(index) = dropdown.options.iter().position(|opt| opt == str_val) {
-                            dropdown.selected = index;
-                            debug!("Loaded dropdown {}.{} = {} (index {})", 
-                                control.table, control.field_name, str_val, index);
-                        }
-                    } else if let Some(num_val) = field_value.as_u64() {
-                        let index = num_val as usize;
-                        if index < dropdown.options.len() {
-                            dropdown.selected = index;
-                            debug!("Loaded dropdown {}.{} = index {}", 
-                                control.table, control.field_name, index);
-                        }
+            if control.table == event.table
+                && let Some(field_value) = obj.get(&control.field_name)
+            {
+                // Handle both string values (option name) and numeric values (index)
+                if let Some(str_val) = field_value.as_str() {
+                    // Find index of option matching the string value
+                    if let Some(index) = dropdown.options.iter().position(|opt| opt == str_val) {
+                        dropdown.selected = index;
+                        debug!("Loaded dropdown {}.{} = {} (index {})", 
+                            control.table, control.field_name, str_val, index);
+                    }
+                } else if let Some(num_val) = field_value.as_u64() {
+                    let index = num_val as usize;
+                    if index < dropdown.options.len() {
+                        dropdown.selected = index;
+                        debug!("Loaded dropdown {}.{} = index {}", 
+                            control.table, control.field_name, index);
                     }
                 }
             }

@@ -254,7 +254,7 @@ impl CircuitBreakerManager {
         if config.per_domain_circuit_breaker {
             self.circuit_breakers
                 .entry(domain.to_string())
-                .or_insert_with(CircuitBreaker::new)
+                .or_default()
         } else {
             &mut self.global_circuit_breaker
         }

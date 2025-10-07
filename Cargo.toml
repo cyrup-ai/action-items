@@ -56,18 +56,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 [workspace.metadata.docs]
 features = ["docs"]
 
-# Globally disable all warnings to suppress external dependency warnings
+# Workspace lints - packages can inherit these
 [workspace.lints.rust]
-warnings = "allow"
-unused = "allow"
-unused_imports = "allow"
-unused_variables = "allow"
-unused_mut = "allow"
-dead_code = "allow"
-deprecated = "allow"
-# Suppress specific warnings that appear in SurrealDB fork
-private_interfaces = "allow"
-mismatched_lifetime_syntaxes = "allow"
+# No global suppression - each package must handle its own warnings
 
 [workspace.dependencies]
 # System monitoring

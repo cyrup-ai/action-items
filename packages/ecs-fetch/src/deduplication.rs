@@ -204,8 +204,19 @@ impl ActiveRequest {
     }
 }
 
+/// Parameters for deduplication check
+pub struct DeduplicationRequest<'a> {
+    pub method: &'a Method,
+    pub url: &'a str,
+    pub headers: Option<&'a reqwest::header::HeaderMap>,
+    pub body: Option<&'a Bytes>,
+    pub operation_id: HttpOperationId,
+    pub correlation_id: CorrelationId,
+    pub requester: &'a str,
+}
+
 /// Request deduplication manager
-#[derive(Debug, Resource)]
+#[derive(Debug, Default, Resource)]
 pub struct DeduplicationManager {
     /// Active requests indexed by fingerprint
     pub active_requests: HashMap<RequestFingerprint, ActiveRequest>,
@@ -213,26 +224,11 @@ pub struct DeduplicationManager {
     pub stats: DeduplicationStats,
 }
 
-impl Default for DeduplicationManager {
-    fn default() -> Self {
-        Self {
-            active_requests: HashMap::new(),
-            stats: DeduplicationStats::default(),
-        }
-    }
-}
-
 impl DeduplicationManager {
     /// Check if request is a duplicate and handle accordingly
     pub fn check_and_handle_duplicate(
         &mut self,
-        method: &Method,
-        url: &str,
-        headers: Option<&reqwest::header::HeaderMap>,
-        body: Option<&Bytes>,
-        operation_id: HttpOperationId,
-        correlation_id: CorrelationId,
-        requester: &str,
+        request: &DeduplicationRequest,
         config: &DeduplicationConfig,
     ) -> DeduplicationResult {
         if !config.enabled {
@@ -243,7 +239,13 @@ impl DeduplicationManager {
         self.cleanup_expired_requests(config);
 
         // Generate fingerprint for the request
-        let fingerprint = RequestFingerprint::from_request(method, url, headers, body, config);
+        let fingerprint = RequestFingerprint::from_request(
+            request.method,
+            request.url,
+            request.headers,
+            request.body,
+            config,
+        );
 
         // Check if this request is already active
         if let Some(active_request) = self.active_requests.get_mut(&fingerprint) {
@@ -255,7 +257,7 @@ impl DeduplicationManager {
                 self.stats.duplicates_rejected += 1;
                 warn!(
                     "Too many pending duplicates for request fingerprint, rejecting: {} {}",
-                    method, url
+                    request.method, request.url
                 );
                 return DeduplicationResult::TooManyDuplicates;
             }
@@ -264,16 +266,16 @@ impl DeduplicationManager {
             active_request
                 .pending_duplicates
                 .push(PendingDuplicateRequest {
-                    operation_id,
-                    correlation_id,
+                    operation_id: request.operation_id,
+                    correlation_id: request.correlation_id,
                     detected_at: Instant::now(),
-                    requester: requester.to_string(),
+                    requester: request.requester.to_string(),
                 });
 
             debug!(
                 "Duplicate request detected: {} {} (original: {:?}, duplicates: {})",
-                method,
-                url,
+                request.method,
+                request.url,
                 active_request.operation_id,
                 active_request.pending_duplicates.len()
             );
@@ -287,11 +289,15 @@ impl DeduplicationManager {
             // This is a new unique request
             self.active_requests.insert(
                 fingerprint.clone(),
-                ActiveRequest::new(operation_id, correlation_id, requester.to_string()),
+                ActiveRequest::new(
+                    request.operation_id,
+                    request.correlation_id,
+                    request.requester.to_string(),
+                ),
             );
 
             self.stats.unique_requests += 1;
-            debug!("New unique request: {} {}", method, url);
+            debug!("New unique request: {} {}", request.method, request.url);
 
             DeduplicationResult::NotDuplicate
         }
@@ -354,11 +360,7 @@ impl DeduplicationManager {
             .find(|(_, active_request)| active_request.operation_id == operation_id)
             .map(|(fingerprint, _)| fingerprint.clone());
 
-        if let Some(fingerprint) = fingerprint {
-            Some(self.complete_request(&fingerprint, None))
-        } else {
-            None
-        }
+        fingerprint.map(|fingerprint| self.complete_request(&fingerprint, None))
     }
 
     /// Clean up expired requests
@@ -584,13 +586,15 @@ mod tests {
 
         // First request should not be a duplicate
         let result1 = manager.check_and_handle_duplicate(
-            &Method::GET,
-            "https://api.example.com/users",
-            None,
-            None,
-            op_id_1,
-            corr_id_1,
-            "requester1",
+            &DeduplicationRequest {
+                method: &Method::GET,
+                url: "https://api.example.com/users",
+                headers: None,
+                body: None,
+                operation_id: op_id_1,
+                correlation_id: corr_id_1,
+                requester: "requester1",
+            },
             &config,
         );
 
@@ -599,13 +603,15 @@ mod tests {
 
         // Second identical request should be a duplicate
         let result2 = manager.check_and_handle_duplicate(
-            &Method::GET,
-            "https://api.example.com/users",
-            None,
-            None,
-            op_id_2,
-            corr_id_2,
-            "requester2",
+            &DeduplicationRequest {
+                method: &Method::GET,
+                url: "https://api.example.com/users",
+                headers: None,
+                body: None,
+                operation_id: op_id_2,
+                correlation_id: corr_id_2,
+                requester: "requester2",
+            },
             &config,
         );
 
@@ -624,25 +630,29 @@ mod tests {
 
         // Add a request with duplicates
         manager.check_and_handle_duplicate(
-            &Method::GET,
-            "https://api.example.com/users",
-            None,
-            None,
-            op_id,
-            corr_id,
-            "requester",
+            &DeduplicationRequest {
+                method: &Method::GET,
+                url: "https://api.example.com/users",
+                headers: None,
+                body: None,
+                operation_id: op_id,
+                correlation_id: corr_id,
+                requester: "requester",
+            },
             &config,
         );
 
         // Add duplicate
         manager.check_and_handle_duplicate(
-            &Method::GET,
-            "https://api.example.com/users",
-            None,
-            None,
-            uuid::Uuid::new_v4(),
-            uuid::Uuid::new_v4(),
-            "requester2",
+            &DeduplicationRequest {
+                method: &Method::GET,
+                url: "https://api.example.com/users",
+                headers: None,
+                body: None,
+                operation_id: uuid::Uuid::new_v4(),
+                correlation_id: uuid::Uuid::new_v4(),
+                requester: "requester2",
+            },
             &config,
         );
 

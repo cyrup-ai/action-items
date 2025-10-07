@@ -137,24 +137,24 @@ pub struct WizardPermissionStatusChanged {
 // Add wizard-specific extension methods
 pub trait PermissionStatusExt {
     /// Get a user-friendly description of this status
-    fn description(self) -> &'static str;
+    fn description(&self) -> &'static str;
     
     /// Get the color associated with this status for UI display
-    fn color(self) -> Color;
+    fn color(&self) -> Color;
     
     /// Check if this status represents a final decision (not pending)
-    fn is_final(self) -> bool;
+    fn is_final(&self) -> bool;
     
     /// Check if this status represents an active operation
-    fn is_active(self) -> bool;
+    fn is_active(&self) -> bool;
     
     /// Check if this status represents a successful grant
-    fn is_granted(self) -> bool;
+    fn is_granted(&self) -> bool;
 }
 
 impl PermissionStatusExt for PermissionStatus {
     #[inline]
-    fn description(self) -> &'static str {
+    fn description(&self) -> &'static str {
         match self {
             PermissionStatus::NotDetermined => "Not Determined",
             PermissionStatus::Authorized => "Granted",
@@ -165,7 +165,7 @@ impl PermissionStatusExt for PermissionStatus {
     }
     
     #[inline]
-    fn color(self) -> Color {
+    fn color(&self) -> Color {
         match self {
             PermissionStatus::NotDetermined => Color::srgb(0.8, 0.6, 0.2), // Orange
             PermissionStatus::Authorized => Color::srgb(0.2, 0.8, 0.2), // Green
@@ -176,7 +176,7 @@ impl PermissionStatusExt for PermissionStatus {
     }
     
     #[inline]
-    fn is_final(self) -> bool {
+    fn is_final(&self) -> bool {
         matches!(
             self,
             PermissionStatus::Authorized | PermissionStatus::Denied | PermissionStatus::Restricted
@@ -184,12 +184,12 @@ impl PermissionStatusExt for PermissionStatus {
     }
     
     #[inline]
-    fn is_active(self) -> bool {
+    fn is_active(&self) -> bool {
         matches!(self, PermissionStatus::NotDetermined)
     }
     
     #[inline]
-    fn is_granted(self) -> bool {
+    fn is_granted(&self) -> bool {
         matches!(self, PermissionStatus::Authorized)
     }
 }

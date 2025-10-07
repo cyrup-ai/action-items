@@ -234,11 +234,17 @@ pub struct SettingsCloseRequested {
     pub operation_id: OperationId,
 }
 
-impl SettingsCloseRequested {
-    pub fn new() -> Self {
+impl Default for SettingsCloseRequested {
+    fn default() -> Self {
         Self {
             operation_id: Uuid::new_v4(),
         }
+    }
+}
+
+impl SettingsCloseRequested {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

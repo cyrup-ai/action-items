@@ -136,21 +136,30 @@ pub fn process_hotkey_registration_requests_system(
                 });
             },
             Err(e) => {
-                warn!(
-                    "Failed to register hotkey {}: {}",
-                    request.binding.definition.description, e
-                );
+                // Format error with platform-specific actionable guidance
+                let formatted_error = {
+                    #[cfg(target_os = "windows")]
+                    { crate::platform::format_windows_error(&e.to_string()) }
+                    
+                    #[cfg(target_os = "linux")]
+                    { crate::platform::format_linux_error(&e.to_string()) }
+                    
+                    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+                    { e.to_string() }
+                };
+                
+                error!("Failed to register hotkey: {}", formatted_error);
 
                 // Try to unregister in case of partial registration
                 if let Err(e) = hotkey_manager.global_manager.unregister(hotkey) {
                     warn!("Failed to unregister hotkey during error cleanup: {}", e);
                 }
 
-                // Generate conflict report
+                // Generate conflict report (use formatted_error for better UX)
                 let _conflict_report = ConflictReport {
                     conflicting_hotkey: request.binding.definition.clone(),
                     conflict_type: ConflictType::AlreadyRegistered,
-                    conflicting_application: extract_conflicting_app_name(&e.to_string()),
+                    conflicting_application: extract_conflicting_app_name(&formatted_error),
                     suggested_alternative: find_alternative_hotkey(
                         &request.binding.definition,
                         &hotkey_manager.global_manager,
@@ -162,7 +171,7 @@ pub fn process_hotkey_registration_requests_system(
                 conflict_detected.write(HotkeyConflictDetected {
                     hotkey_definition: request.binding.definition.clone(),
                     conflict_type: "AlreadyRegistered".to_string(),
-                    conflicting_app: extract_conflicting_app_name(&e.to_string()),
+                    conflicting_app: extract_conflicting_app_name(&formatted_error),
                     suggested_alternatives: vec![],
                 });
 
@@ -170,7 +179,7 @@ pub fn process_hotkey_registration_requests_system(
                     binding: request.binding.clone(),
                     requester: request.binding.requester.clone(),
                     success: false,
-                    error_message: Some(e.to_string()),
+                    error_message: Some(formatted_error),
                 });
             },
         }
@@ -240,10 +249,19 @@ pub fn process_hotkey_unregistration_requests_system(
                     });
                 },
                 Err(e) => {
-                    warn!(
-                        "Failed to unregister hotkey {}: {}",
-                        definition.description, e
-                    );
+                    let formatted_error = {
+                        #[cfg(target_os = "windows")]
+                        { crate::platform::format_windows_error(&e.to_string()) }
+                        
+                        #[cfg(target_os = "linux")]
+                        { crate::platform::format_linux_error(&e.to_string()) }
+                        
+                        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+                        { e.to_string() }
+                    };
+                    
+                    error!("Failed to unregister hotkey {}: {}", definition.description, formatted_error);
+                    
                     // Don't remove from registry since OS still has it
                     unregistration_completed.write(HotkeyUnregisterCompleted {
                         hotkey_id: request.hotkey_id.clone(),
@@ -440,15 +458,24 @@ pub fn process_hotkey_test_requests_system(
                 });
             },
             Err(e) => {
-                info!(
-                    "Hotkey test failed: {} - {}",
-                    request.definition.description, e
-                );
+                let formatted_error = {
+                    #[cfg(target_os = "windows")]
+                    { crate::platform::format_windows_error(&e.to_string()) }
+                    
+                    #[cfg(target_os = "linux")]
+                    { crate::platform::format_linux_error(&e.to_string()) }
+                    
+                    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+                    { e.to_string() }
+                };
+                
+                info!("Hotkey test failed: {}", formatted_error);
+                
                 test_results.write(HotkeyTestResult {
                     hotkey_definition: request.definition.clone(),
                     requester: request.requester.clone(),
                     success: false,
-                    error_message: Some(e.to_string()),
+                    error_message: Some(formatted_error),
                     test_timestamp: std::time::Instant::now(),
                 });
             },

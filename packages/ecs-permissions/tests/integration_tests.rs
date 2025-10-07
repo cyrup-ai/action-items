@@ -148,7 +148,7 @@ fn test_permission_set_request_basic() {
     assert!(!responses.is_empty(), "Should have received at least one response");
     
     let response = &responses[0];
-    assert_eq!(response.request_id.contains("test_service"), true);
+    assert!(response.request_id.contains("test_service"));
 }
 
 /// Test permission set request with wizard triggering
@@ -414,7 +414,7 @@ fn test_wizard_cancellation_cleanup() {
     // Move to requesting permissions state
     let mut next_state = app.world_mut().resource_mut::<NextState<WizardState>>();
     next_state.set(WizardState::RequestingPermissions);
-    drop(next_state);
+    // Mut<NextState> doesn't implement Drop, no need to explicitly drop
     app.update();
     
     // Send cancellation request
@@ -436,9 +436,9 @@ fn test_wizard_cancellation_cleanup() {
     
     assert!(!responses.is_empty(), "Should send cancellation response");
     let response = &responses[0];
-    assert_eq!(response.completed, false, "Response should indicate incomplete");
+    assert!(!response.completed, "Response should indicate incomplete");
     assert_eq!(response.cancellation_reason, Some(WizardCancelReason::UserCanceled), "Should have cancellation reason");
-    assert_eq!(response.progress_saved, true, "Should save progress on user cancellation");
+    assert!(response.progress_saved, "Should save progress on user cancellation");
 }
 
 /// Test wizard cancellation saves partial progress
@@ -509,7 +509,7 @@ fn test_first_run_auto_start() {
     detector.is_first_run = true;
     detector.wizard_completed = false;
     detector.check_completed = false;  // Allow checking to occur
-    drop(detector);
+    // Mut<FirstRunDetector> doesn't implement Drop, no need to explicitly drop
     
     // Run update cycles to allow auto-start
     for _ in 0..5 {
@@ -531,7 +531,7 @@ fn test_wizard_completion_prevents_auto_start() {
     detector.is_first_run = false;
     detector.wizard_completed = true;
     detector.check_completed = true;
-    drop(detector);
+    // Mut<FirstRunDetector> doesn't implement Drop, no need to explicitly drop
     
     // Run update cycles
     for _ in 0..5 {
@@ -561,7 +561,7 @@ fn test_wizard_completion_persistence() {
     
     // Verify FirstRunDetector updated
     let detector = app.world().resource::<FirstRunDetector>();
-    assert_eq!(detector.wizard_completed, true, "FirstRunDetector should mark wizard as completed");
+    assert!(detector.wizard_completed, "FirstRunDetector should mark wizard as completed");
     assert!(detector.completion_timestamp.is_some(), "Should have completion timestamp");
 }
 
@@ -602,7 +602,7 @@ fn test_permission_denial_error_handling() {
     assert!(error.is_some(), "Should generate error message for denial");
     
     if let Some(error_detail) = error {
-        assert_eq!(error_detail.is_critical, true, "Accessibility denial should be critical");
+        assert!(error_detail.is_critical, "Accessibility denial should be critical");
         assert!(error_detail.title.contains("Denied") || error_detail.title.contains("denied"), "Error title should mention denial");
         assert!(!error_detail.recovery.is_empty(), "Should provide recovery steps");
     }
@@ -654,7 +654,7 @@ fn test_system_error_cancellation() {
     assert!(!responses.is_empty(), "Should send response for system error");
     let response = &responses[0];
     assert_eq!(response.cancellation_reason, Some(WizardCancelReason::SystemError), "Should indicate system error reason");
-    assert_eq!(response.progress_saved, true, "System errors should save progress");
+    assert!(response.progress_saved, "System errors should save progress");
 }
 
 // =============================================================================

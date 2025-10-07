@@ -4,23 +4,17 @@
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::io::{Read, Write};
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
 use std::time::Instant;
 
 use bevy::prelude::*;
-use lz4_flex::block::{compress_into, decompress_into};
-use brotli::{CompressorReader, Decompressor};
-use snap::{raw::Encoder as SnapEncoder, raw::Decoder as SnapDecoder};
 use flate2::{Compression, read::GzDecoder, write::GzEncoder, read::DeflateDecoder, write::DeflateEncoder};
-use tracing::warn;
 
 use crate::types::{
     CompressedData, CompressionAlgorithm, CompressionConfig, CompressionError, CompressionStats,
 };
 
-/// Thread-local buffer pool for true zero-allocation compression
+// Thread-local buffer pool for true zero-allocation compression
 thread_local! {
     static BUFFER_POOL: RefCell<VecDeque<Vec<u8>>> = RefCell::new(VecDeque::with_capacity(16));
 }
@@ -118,38 +112,17 @@ impl Drop for PooledBuffer {
     }
 }
 
-/// Legacy buffer pool struct (kept for compatibility during transition)
-#[derive(Debug)]
-struct BufferPool {
-    _phantom: std::marker::PhantomData<()>,
-}
-
-impl BufferPool {
-    fn new(_max_size: usize) -> Self {
-        Self {
-            _phantom: std::marker::PhantomData,
-        }
-    }
-
-    #[inline]
-    fn get_buffer(&self) -> PooledBuffer {
-        PooledBuffer::acquire()
-    }
-}
-
 /// Compression manager resource following ARCHITECTURE.md patterns
 #[derive(Debug, Clone, Resource)]
 pub struct CompressionManager {
     config: CompressionConfig,
     stats: CompressionStats,
-    buffer_pool: Arc<BufferPool>,
 }
 
 impl CompressionManager {
     /// Create new compression manager with configuration
     pub fn new(config: CompressionConfig) -> Self {
         Self {
-            buffer_pool: Arc::new(BufferPool::new(config.max_pool_size)),
             config,
             stats: CompressionStats::new(),
         }
@@ -158,7 +131,6 @@ impl CompressionManager {
     /// Create compression manager with shared statistics
     pub fn with_shared_stats(config: CompressionConfig, stats: CompressionStats) -> Self {
         Self {
-            buffer_pool: Arc::new(BufferPool::new(config.max_pool_size)),
             config,
             stats,
         }

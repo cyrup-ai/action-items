@@ -96,7 +96,7 @@ impl HttpMetricsCollector {
         let endpoint = self.normalize_endpoint(url);
         self.latency_histograms
             .entry(endpoint)
-            .or_insert_with(LatencyHistogram::new);
+            .or_default();
 
         debug!("Request started: {} {}", method, url);
     }
@@ -362,6 +362,12 @@ pub struct LatencyHistogram {
     pub min: Option<u64>,
     /// Maximum value in milliseconds
     pub max: Option<u64>,
+}
+
+impl Default for LatencyHistogram {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LatencyHistogram {
@@ -782,7 +788,7 @@ pub fn metrics_reporting_system(
     metrics_collector: Res<HttpMetricsCollector>,
     mut report_events: EventReader<MetricsReportRequested>,
     mut generated_events: EventWriter<MetricsReportGenerated>,
-    time: Res<Time>,
+    _time: Res<Time>,
 ) {
     for _report_request in report_events.read() {
         let snapshot = metrics_collector.get_metrics_snapshot();

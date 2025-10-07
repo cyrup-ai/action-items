@@ -459,7 +459,7 @@ pub struct HttpRequestBuilder {
     headers: reqwest::header::HeaderMap,
     body: Option<bytes::Bytes>,
     timeout: Duration,
-    retry_policy: RequestRetryPolicy,
+    _retry_policy: RequestRetryPolicy,
     cache_policy: CachePolicy,
     priority: RequestPriority,
 }
@@ -483,7 +483,7 @@ impl HttpRequestBuilder {
             headers: reqwest::header::HeaderMap::new(),
             body: None,
             timeout: Duration::from_secs(30),
-            retry_policy: RequestRetryPolicy::default(),
+            _retry_policy: RequestRetryPolicy::default(),
             cache_policy: CachePolicy::default(),
             priority: RequestPriority::Normal,
         }

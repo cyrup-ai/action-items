@@ -20,6 +20,10 @@ use crate::wizard::ui::theme::WizardTheme;
 use crate::wizard::ui::{get_permission_icon, get_permission_status_indicator, get_permission_status_color};
 use crate::wizard::systems::permissions::WizardPermissionManager;
 
+// Type aliases for complex query types to improve readability and satisfy clippy
+type WizardTextQuery<'w, 's> = Query<'w, 's, (Entity, &'static mut Text), (With<Name>, Without<PermissionCard>)>;
+type PermissionStatusQuery<'w, 's> = Query<'w, 's, (&'static mut Text, &'static mut TextColor), (With<PermissionCardStatus>, Without<PermissionCardTitle>)>;
+
 /// System to update permission cards with smooth animations
 /// 
 /// Updates permission card states, colors, and animations based on current
@@ -162,7 +166,7 @@ pub fn update_wizard_progress_with_layout(
 pub fn update_wizard_status_text(
     wizard_state: Res<State<WizardState>>,
     permission_manager: Option<Res<WizardPermissionManager>>,
-    mut text_query: Query<(Entity, &mut Text), (With<Name>, Without<PermissionCard>)>,
+    mut text_query: WizardTextQuery,
     names: Query<&Name>,
 ) {
     if !wizard_state.is_changed() {
@@ -930,7 +934,7 @@ pub fn populate_wizard_panel_content_system(
 pub fn integrate_icons_into_permission_cards(
     card_query: Query<(&PermissionCard, &Children), Changed<PermissionCard>>,
     mut title_query: Query<&mut Text, With<PermissionCardTitle>>,
-    mut status_query: Query<(&mut Text, &mut TextColor), (With<PermissionCardStatus>, Without<PermissionCardTitle>)>,
+    mut status_query: PermissionStatusQuery,
 ) {
     for (card, children) in card_query.iter() {
         // Update title with icon

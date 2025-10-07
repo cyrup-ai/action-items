@@ -135,7 +135,6 @@ pub fn configure_app() -> App {
                 level: Level::DEBUG,
                 filter: "wgpu=error,naga=warn,bevy_render=info,bevy_ecs=info".into(),
                 custom_layer: file_logging_layer,
-                ..Default::default()
             })
             .add(winit_plugin)
             .set(WindowPlugin {
@@ -204,7 +203,7 @@ pub fn configure_app() -> App {
         SettingsPlugin,                    // Settings management core
         SettingsUIPlugin::default(),       // Settings UI with tab navigation
         PreferencesPlugin,                 // Preferences core (hotkey management)
-        PreferencesUIPlugin::default(),    // Preferences UI with recording
+        PreferencesUIPlugin,    // Preferences UI with recording
     ))
     // Task and launcher services
     .add_plugins((

@@ -138,6 +138,12 @@ impl Plugin for HotkeyPlugin {
     fn build(&self, app: &mut App) {
         info!("Initializing ECS Hotkey Service Plugin");
 
+        // Validate platform permissions before initializing
+        if let Err(e) = crate::platform::check_platform_permissions() {
+            error!("❌ Platform hotkey permissions check failed: {}", e);
+            error!("⚠️  Hotkey functionality may not work correctly");
+        }
+
         // Initialize resources with Wayland support on Linux
         let hotkey_manager_opt: Option<HotkeyManager> = {
             #[cfg(target_os = "linux")]
@@ -248,6 +254,9 @@ impl Plugin for HotkeyPlugin {
         // Add platform-specific startup systems
         #[cfg(target_os = "macos")]
         app.add_systems(Startup, crate::platform::macos::setup_macos_hotkey_system);
+
+        // Display platform-specific hotkey information at startup
+        app.add_systems(Startup, display_platform_hotkey_info_system);
 
         // Add profile loading startup system
         app.add_systems(Startup, load_hotkey_profiles_startup_system);
@@ -360,3 +369,17 @@ pub enum HotkeySystemSet {
 }
 
 // HotkeyConfig moved to resources.rs
+
+/// Display platform-specific hotkey information at startup
+///
+/// Shows user-friendly messages about hotkey readiness and platform details
+fn display_platform_hotkey_info_system() {
+    #[cfg(target_os = "windows")]
+    crate::platform::display_windows_hotkey_info();
+    
+    #[cfg(target_os = "linux")]
+    crate::platform::display_linux_hotkey_info();
+    
+    #[cfg(target_os = "macos")]
+    crate::platform::display_macos_hotkey_info();
+}

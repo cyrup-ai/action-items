@@ -18,7 +18,7 @@ fn test_bezier_easing_ease_in() {
     // EASE_IN is (0.42, 0.0, 1.0, 1.0)
     // At x=0.5, should return a value between 0.0 and 1.0
     let result = ease_in.apply(0.5);
-    assert!(result >= 0.0 && result <= 1.0, "Result {} should be in [0.0, 1.0]", result);
+    assert!((0.0..=1.0).contains(&result), "Result {} should be in [0.0, 1.0]", result);
 
     // EASE_IN should start slow, so at x=0.5 should be less than 0.5 (below linear)
     assert!(result < 0.5, "EASE_IN(0.5) = {} should be < 0.5 (slow start)", result);
@@ -35,7 +35,7 @@ fn test_bezier_easing_ease_out() {
     // EASE_OUT is (0.0, 0.0, 0.58, 1.0)
     // At x=0.5, should return a value between 0.0 and 1.0
     let result = ease_out.apply(0.5);
-    assert!(result >= 0.0 && result <= 1.0, "Result {} should be in [0.0, 1.0]", result);
+    assert!((0.0..=1.0).contains(&result), "Result {} should be in [0.0, 1.0]", result);
 
     // EASE_OUT should start fast, so at x=0.5 should be greater than 0.5 (above linear)
     assert!(result > 0.5, "EASE_OUT(0.5) = {} should be > 0.5 (fast start)", result);
@@ -52,7 +52,7 @@ fn test_bezier_easing_ease_in_out() {
     // EASE_IN_OUT is (0.42, 0.0, 0.58, 1.0)
     // At x=0.5, should return approximately 0.5 (S-curve)
     let result = ease_in_out.apply(0.5);
-    assert!(result >= 0.0 && result <= 1.0, "Result {} should be in [0.0, 1.0]", result);
+    assert!((0.0..=1.0).contains(&result), "Result {} should be in [0.0, 1.0]", result);
 
     // Should be close to 0.5 for symmetric ease-in-out
     assert!((result - 0.5).abs() < 0.1, "EASE_IN_OUT(0.5) = {} should be close to 0.5", result);
@@ -78,7 +78,7 @@ fn test_bezier_easing_custom() {
 
     // Values in between should be valid
     let result = custom.apply(0.5);
-    assert!(result >= 0.0 && result <= 1.0, "Result {} should be in [0.0, 1.0]", result);
+    assert!((0.0..=1.0).contains(&result), "Result {} should be in [0.0, 1.0]", result);
 }
 
 #[test]

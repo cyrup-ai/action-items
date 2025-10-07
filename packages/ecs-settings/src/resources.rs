@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use crate::navigation::{SettingsTab, ExtensionFilter};
 
 /// Settings state management resource
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct SettingsResource {
     /// Currently active tab
     pub current_tab: SettingsTab,
@@ -21,19 +21,6 @@ pub struct SettingsResource {
     
     /// Dirty state - unsaved changes
     pub has_unsaved_changes: bool,
-}
-
-impl Default for SettingsResource {
-    fn default() -> Self {
-        Self {
-            current_tab: SettingsTab::default(),
-            is_visible: false,
-            search_query: String::new(),
-            extensions_filter: ExtensionFilter::default(),
-            selected_extension: None,
-            has_unsaved_changes: false,
-        }
-    }
 }
 
 impl SettingsResource {

@@ -26,6 +26,9 @@ action_items_common = { path = "../common", features = ["bevy"] }
 [dev-dependencies]
 tempfile = "3.8"
 
+[features]
+integration-tests = []
+
 [lib]
 name = "action_items_ecs_user_settings"
 path = "src/lib.rs"

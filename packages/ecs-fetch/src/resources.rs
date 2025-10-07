@@ -9,7 +9,6 @@ use std::time::{Duration, Instant};
 use ahash::AHashMap;
 use bevy::prelude::*;
 use governor::clock::DefaultClock;
-use governor::middleware::NoOpMiddleware;
 use governor::{Quota, RateLimiter};
 use reqwest::Client;
 
@@ -25,7 +24,7 @@ pub struct HttpClientPool {
     /// Connection metrics per host
     connection_metrics: Arc<std::sync::Mutex<std::collections::HashMap<String, ConnectionMetrics>>>,
     /// Client configuration
-    config: ClientPoolConfig,
+    _config: ClientPoolConfig,
 }
 
 /// Connection metrics for tracking per-host statistics
@@ -72,7 +71,7 @@ impl HttpClientPool {
             next_client: std::sync::atomic::AtomicUsize::new(0),
             active_connections: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             connection_metrics: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
-            config,
+            _config: config,
         })
     }
 

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, SystemTime};
 
 use base64::Engine as _;
 use base64::engine::general_purpose;
@@ -183,21 +183,12 @@ impl Default for TokenRefreshConfig {
 }
 
 /// Authentication manager resource
-#[derive(Debug, Resource)]
+#[derive(Debug, Default, Resource)]
 pub struct AuthManager {
     /// Active authentication sessions
     pub auth_sessions: HashMap<String, AuthSession>,
     /// Token cache for reuse
     pub token_cache: HashMap<String, CachedToken>,
-}
-
-impl Default for AuthManager {
-    fn default() -> Self {
-        Self {
-            auth_sessions: HashMap::new(),
-            token_cache: HashMap::new(),
-        }
-    }
 }
 
 impl AuthManager {
@@ -548,7 +539,7 @@ mod tests {
 
     #[test]
     fn test_auth_manager_domain_selection() {
-        let mut auth_manager = AuthManager::default();
+        let auth_manager = AuthManager::default();
         let mut config = AuthConfig::default();
 
         // Add global auth

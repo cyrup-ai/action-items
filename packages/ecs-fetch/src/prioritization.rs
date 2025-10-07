@@ -156,7 +156,7 @@ impl PrioritizedRequest {
         let boost = self.calculate_age_boost(age, config);
 
         self.effective_priority =
-            (Self::priority_to_value(self.original_priority) + boost).min(255);
+            Self::priority_to_value(self.original_priority).saturating_add(boost);
     }
 
     /// Calculate priority boost based on age
@@ -247,7 +247,7 @@ pub struct PriorityFactor {
 }
 
 /// Priority queue implementation for HTTP requests
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PriorityQueue {
     /// High-priority heap (max-heap by effective priority)
     high_priority_heap: BinaryHeap<PrioritizedRequestWrapper>,
@@ -257,17 +257,6 @@ pub struct PriorityQueue {
     background_priority_queue: VecDeque<PrioritizedRequest>,
     /// Total requests queued
     total_queued: usize,
-}
-
-impl Default for PriorityQueue {
-    fn default() -> Self {
-        Self {
-            high_priority_heap: BinaryHeap::new(),
-            normal_priority_queue: VecDeque::new(),
-            background_priority_queue: VecDeque::new(),
-            total_queued: 0,
-        }
-    }
 }
 
 impl PriorityQueue {
@@ -479,11 +468,11 @@ impl PrioritizationManager {
         let request = PrioritizedRequest::new(operation_id, correlation_id, priority, metadata);
 
         // Check high priority rate limiting
-        if matches!(priority, RequestPriority::Critical | RequestPriority::High) {
-            if !self.high_priority_rate_limiter.try_acquire() {
-                self.stats.high_priority_rate_limited += 1;
-                return Err(PrioritizationError::HighPriorityRateLimited);
-            }
+        if matches!(priority, RequestPriority::Critical | RequestPriority::High)
+            && !self.high_priority_rate_limiter.try_acquire()
+        {
+            self.stats.high_priority_rate_limited += 1;
+            return Err(PrioritizationError::HighPriorityRateLimited);
         }
 
         self.queue.enqueue(request, config)?;

@@ -111,6 +111,21 @@ pub struct ExtensionSettingsButton {
     pub plugin_id: String,
 }
 
+/// About tab: Visit Website button
+#[derive(Component)]
+pub struct VisitWebsiteButton;
+
+/// About tab: Send Feedback button
+#[derive(Component)]
+pub struct SendFeedbackButton;
+
+/// About tab: Acknowledgements link
+#[derive(Component)]
+pub struct AcknowledgementsLink;
+
+/// About tab: App logo placeholder
+#[derive(Component)]
+pub struct AboutAppLogo;
 
 /// Marker for backdrop overlay
 #[derive(Component)]
@@ -127,3 +142,96 @@ pub struct SettingsTitleBar;
 /// Marker for close button
 #[derive(Component)]
 pub struct CloseSettingsButton;
+
+/// Marker for the profile sidebar container (left 25%)
+#[derive(Component)]
+pub struct UserProfileSidebar;
+
+/// Profile photo component with user initials and optional avatar URL
+#[derive(Component)]
+pub struct ProfilePhoto {
+    pub initials: String,
+    pub avatar_url: Option<String>,
+}
+
+/// Subscription status display box
+#[derive(Component)]
+pub struct SubscriptionStatusBox;
+
+/// Individual feature row in Pro/Organizations/Developer sections
+#[derive(Component)]
+pub struct FeatureRow {
+    pub feature_id: String,
+    pub section: String,  // "pro", "organizations", "developer"
+}
+
+/// Blue "Pro" badge component
+#[derive(Component)]
+pub struct ProBadge;
+
+/// Info icon "ⓘ" component
+#[derive(Component)]
+pub struct InfoIcon;
+
+/// Red "Log Out" button
+#[derive(Component)]
+pub struct LogOutButton;
+
+/// Gray "Manage Subscription" button
+#[derive(Component)]
+pub struct ManageSubscriptionButton;
+
+/// Organizations tab components
+
+#[derive(Component)]
+pub struct OrganizationsScreen;
+
+#[derive(Component)]
+pub struct OrganizationsSidebar;
+
+#[derive(Component)]
+pub struct OrganizationListItem {
+    pub org_id: String,
+    pub selected: bool,
+}
+
+#[derive(Component)]
+pub struct CreateOrgButton;
+
+#[derive(Component)]
+pub struct OrganizationLogo {
+    pub org_id: String,
+}
+
+#[derive(Component)]
+pub struct PlanBadge {
+    pub plan_type: String,  // "Free", "Pro", "Enterprise"
+}
+
+#[derive(Component)]
+pub struct InfoCard;
+
+#[derive(Component)]
+pub struct ManageOrgButton {
+    pub org_id: String,
+}
+
+#[derive(Component)]
+pub struct EditOrgButton {
+    pub org_id: String,
+}
+
+#[derive(Component)]
+pub struct OpenStoreButton {
+    pub org_id: String,
+}
+
+#[derive(Component)]
+pub struct LeaveOrgButton {
+    pub org_id: String,
+}
+
+#[derive(Component)]
+pub struct ManageOrgSubscriptionButton {
+    pub org_id: String,
+}

@@ -45,21 +45,12 @@ impl Default for StreamingConfig {
 }
 
 /// Streaming response manager
-#[derive(Debug, Resource)]
+#[derive(Debug, Default, Resource)]
 pub struct StreamingManager {
     /// Active streams
     pub active_streams: HashMap<HttpOperationId, ActiveStream>,
     /// Streaming statistics
     pub stats: StreamingStats,
-}
-
-impl Default for StreamingManager {
-    fn default() -> Self {
-        Self {
-            active_streams: HashMap::new(),
-            stats: StreamingStats::default(),
-        }
-    }
 }
 
 impl StreamingManager {
@@ -724,13 +715,15 @@ mod tests {
 
     #[test]
     fn test_streaming_stats() {
-        let mut stats = StreamingStats::default();
-        stats.streams_started = 100;
-        stats.streams_completed = 90;
-        stats.streams_cancelled = 5;
-        stats.streams_errored = 3;
-        stats.total_bytes_streamed = 1000000;
-        stats.total_stream_duration = Duration::from_secs(100);
+        let stats = StreamingStats {
+            streams_started: 100,
+            streams_completed: 90,
+            streams_cancelled: 5,
+            streams_errored: 3,
+            total_bytes_streamed: 1000000,
+            total_stream_duration: Duration::from_secs(100),
+            ..Default::default()
+        };
 
         assert_eq!(stats.success_rate(), 0.9);
         assert_eq!(stats.average_streaming_rate(), 10000.0);

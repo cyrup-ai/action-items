@@ -7,19 +7,29 @@ use ecs_service_bridge::components::{PluginComponent, PluginStatus, PluginType};
 use uuid::Uuid;
 use super::theme::*;
 
+// Type aliases for complex query types to improve readability and satisfy clippy
+type CheckboxInteractionQuery<'w, 's> = Query<'w, 's, (&'static SettingControl, &'static mut SettingCheckbox, &'static Interaction), (Changed<Interaction>, With<SettingCheckbox>)>;
+type DropdownInteractionQuery<'w, 's> = Query<'w, 's, (&'static SettingControl, &'static mut DropdownControl, &'static Interaction), (Changed<Interaction>, With<DropdownControl>)>;
+type ThemeStudioQuery<'w, 's> = Query<'w, 's, (&'static Interaction, &'static UiClicked), (With<ThemeStudioButton>, Changed<Interaction>)>;
+type LogOutQuery<'w, 's> = Query<'w, 's, (&'static Interaction, &'static UiClicked), (With<LogOutButton>, Changed<Interaction>)>;
+type ManageSubscriptionQuery<'w, 's> = Query<'w, 's, (&'static Interaction, &'static UiClicked), (With<ManageSubscriptionButton>, Changed<Interaction>)>;
+type VisitWebsiteQuery<'w, 's> = Query<'w, 's, (&'static Interaction, &'static UiClicked), (With<crate::ui::components::VisitWebsiteButton>, Changed<Interaction>)>;
+type SendFeedbackQuery<'w, 's> = Query<'w, 's, (&'static Interaction, &'static UiClicked), (With<crate::ui::components::SendFeedbackButton>, Changed<Interaction>)>;
+type AcknowledgementsQuery<'w, 's> = Query<'w, 's, (&'static Interaction, &'static UiClicked), (With<crate::ui::components::AcknowledgementsLink>, Changed<Interaction>)>;
+
 /// Sync SettingsResource visibility state to window Visibility component
 pub fn sync_window_visibility(
     settings: Res<SettingsResource>,
     mut query: Query<&mut Visibility, With<SettingsWindow>>,
 ) {
-    if settings.is_changed() {
-        if let Ok(mut visibility) = query.single_mut() {
-            *visibility = if settings.is_visible {
-                Visibility::Visible
-            } else {
-                Visibility::Hidden
-            };
-        }
+    if settings.is_changed()
+        && let Ok(mut visibility) = query.single_mut()
+    {
+        *visibility = if settings.is_visible {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
     }
 }
 
@@ -72,10 +82,10 @@ pub fn switch_tab_visibility(
         }
         
         // Show ONLY the active tab panel
-        if let Some(active_panel) = entities.tab_panels.get(&event.tab) {
-            if let Ok(mut vis) = visibility.get_mut(*active_panel) {
-                *vis = Visibility::Visible;
-            }
+        if let Some(active_panel) = entities.tab_panels.get(&event.tab)
+            && let Ok(mut vis) = visibility.get_mut(*active_panel)
+        {
+            *vis = Visibility::Visible;
         }
     }
 }
@@ -152,8 +162,7 @@ pub fn handle_escape_close(
 
 /// Handle checkbox toggle clicks
 pub fn handle_checkbox_changes(
-    mut query: Query<(&SettingControl, &mut SettingCheckbox, &Interaction), 
-        (Changed<Interaction>, With<SettingCheckbox>)>,
+    mut query: CheckboxInteractionQuery,
     mut write_events: EventWriter<SettingUpdateRequested>,
     resource: Res<SettingsResource>,
 ) {
@@ -190,8 +199,7 @@ pub fn handle_text_input_changes(
 
 /// Handle dropdown selection changes
 pub fn handle_dropdown_changes(
-    mut query: Query<(&SettingControl, &mut DropdownControl, &Interaction), 
-        (Changed<Interaction>, With<DropdownControl>)>,
+    mut query: DropdownInteractionQuery,
     mut write_events: EventWriter<SettingUpdateRequested>,
     resource: Res<SettingsResource>,
 ) {
@@ -517,7 +525,7 @@ pub fn handle_window_mode_selection(
 
 /// Handle theme studio button click
 pub fn handle_theme_studio_click(
-    query: Query<(&Interaction, &UiClicked), (With<ThemeStudioButton>, Changed<Interaction>)>,
+    query: ThemeStudioQuery,
 ) {
     for (interaction, clicked) in query.iter() {
         if *interaction == Interaction::Pressed && clicked.value > 0.9 {
@@ -542,7 +550,7 @@ pub fn handle_extension_search(
                 let matches = query.is_empty() ||
                     plugin.name.to_lowercase().contains(&query) ||
                     plugin.description.to_lowercase().contains(&query) ||
-                    plugin.author.as_ref().map_or(false, |a| a.to_lowercase().contains(&query));
+                    plugin.author.as_ref().is_some_and(|a| a.to_lowercase().contains(&query));
                 
                 *visibility = if matches {
                     Visibility::Visible
@@ -612,6 +620,186 @@ pub fn handle_extension_settings_button(
                 "true",
                 "settings_button"
             ));
+        }
+    }
+}
+
+/// Handle log out button clicks
+pub fn handle_log_out_click(
+    query: LogOutQuery,
+) {
+    for (interaction, clicked) in query.iter() {
+        if *interaction == Interaction::Pressed && clicked.value > 0.9 {
+            warn!("🚪 Log out requested by user");
+            // Phase 1: Just log the action
+            // Phase 2: Show confirmation modal
+            // Phase 3: Clear session and redirect to login
+        }
+    }
+}
+
+/// Handle manage subscription button clicks
+pub fn handle_manage_subscription_click(
+    query: ManageSubscriptionQuery,
+) {
+    for (interaction, clicked) in query.iter() {
+        if *interaction == Interaction::Pressed && clicked.value > 0.9 {
+            info!("💳 Opening billing portal");
+
+            let url = "https://billing.actionitems.ai/portal";
+
+            #[cfg(target_os = "macos")]
+            let _ = std::process::Command::new("open")
+                .arg(url)
+                .spawn();
+
+            #[cfg(target_os = "linux")]
+            let _ = std::process::Command::new("xdg-open")
+                .arg(url)
+                .spawn();
+
+            #[cfg(target_os = "windows")]
+            let _ = std::process::Command::new("cmd")
+                .args(&["/C", "start", "", url])
+                .spawn();
+        }
+    }
+}
+
+/// Handle visit website button clicks  
+pub fn handle_visit_website_click(
+    query: VisitWebsiteQuery,
+) {
+    for (interaction, clicked) in query.iter() {
+        if *interaction == Interaction::Pressed && clicked.value > 0.9 {
+            info!("🌐 Opening website: https://actionitems.ai");
+            if let Err(e) = opener::open("https://actionitems.ai") {
+                warn!("Failed to open website: {}", e);
+            }
+        }
+    }
+}
+
+/// Handle send feedback button clicks
+pub fn handle_send_feedback_click(
+    query: SendFeedbackQuery,
+) {
+    for (interaction, clicked) in query.iter() {
+        if *interaction == Interaction::Pressed && clicked.value > 0.9 {
+            let subject = "Action Items Feedback - v1.0.0";
+            let mailto_url = format!("mailto:feedback@actionitems.ai?subject={}",
+                urlencoding::encode(subject));
+
+            info!("📧 Opening email client: {}", mailto_url);
+            if let Err(e) = opener::open(&mailto_url) {
+                warn!("Failed to open email client: {}", e);
+            }
+        }
+    }
+}
+
+/// Handle acknowledgements link clicks
+pub fn handle_acknowledgements_click(
+    query: AcknowledgementsQuery,
+) {
+    for (interaction, clicked) in query.iter() {
+        if *interaction == Interaction::Pressed && clicked.value > 0.9 {
+            info!("📜 Acknowledgements: Built with Bevy Engine and open source libraries");
+            // Phase 2 (future): Show modal with full dependency list
+        }
+    }
+}
+
+/// Handle organization list item selection
+pub fn handle_org_selection_click(
+    query: Query<(&Interaction, &OrganizationListItem), Changed<Interaction>>,
+) {
+    for (interaction, item) in query.iter() {
+        if *interaction == Interaction::Pressed {
+            info!("Selected organization: {} ({})", item.org_id, if item.selected { "already selected" } else { "switching" });
+            // TODO Phase 2: Update main panel to show selected org
+        }
+    }
+}
+
+/// Handle "Manage Organization" button click
+pub fn handle_manage_org_click(
+    query: Query<(&Interaction, &ManageOrgButton), Changed<Interaction>>,
+) {
+    for (interaction, button) in query.iter() {
+        if *interaction == Interaction::Pressed {
+            info!("Opening manage interface for organization: {}", button.org_id);
+            // TODO Phase 2: Open management modal
+        }
+    }
+}
+
+/// Handle "Edit Organization" button click
+pub fn handle_edit_org_click(
+    query: Query<(&Interaction, &EditOrgButton), Changed<Interaction>>,
+) {
+    for (interaction, button) in query.iter() {
+        if *interaction == Interaction::Pressed {
+            info!("Opening edit interface for organization: {}", button.org_id);
+            // TODO Phase 2: Open edit modal
+        }
+    }
+}
+
+/// Handle "Open Store" button click
+pub fn handle_open_store_click(
+    query: Query<(&Interaction, &OpenStoreButton), Changed<Interaction>>,
+) {
+    for (interaction, button) in query.iter() {
+        if *interaction == Interaction::Pressed {
+            info!("Opening store for organization: {}", button.org_id);
+            #[cfg(target_os = "macos")]
+            {
+                let _ = std::process::Command::new("open")
+                    .arg(format!("https://store.actionitems.ai/org/{}", button.org_id))
+                    .spawn();
+            }
+        }
+    }
+}
+
+/// Handle "Leave Organization" button click
+pub fn handle_leave_org_click(
+    query: Query<(&Interaction, &LeaveOrgButton), Changed<Interaction>>,
+) {
+    for (interaction, button) in query.iter() {
+        if *interaction == Interaction::Pressed {
+            warn!("Leave organization requested: {}", button.org_id);
+            // TODO Phase 2: Show confirmation modal
+        }
+    }
+}
+
+/// Handle "Manage Subscription" button click (Organizations tab)
+pub fn handle_manage_org_subscription_click(
+    query: Query<(&Interaction, &ManageOrgSubscriptionButton), Changed<Interaction>>,
+) {
+    for (interaction, button) in query.iter() {
+        if *interaction == Interaction::Pressed {
+            info!("Opening subscription management for organization: {}", button.org_id);
+            #[cfg(target_os = "macos")]
+            {
+                let _ = std::process::Command::new("open")
+                    .arg("https://billing.actionitems.ai/org")
+                    .spawn();
+            }
+        }
+    }
+}
+
+/// Handle "+ Create New Organization" button click
+pub fn handle_create_org_click(
+    query: Query<(&Interaction, &CreateOrgButton), Changed<Interaction>>,
+) {
+    for (interaction, _button) in query.iter() {
+        if *interaction == Interaction::Pressed {
+            info!("Create new organization requested");
+            // TODO Phase 2: Open creation modal
         }
     }
 }

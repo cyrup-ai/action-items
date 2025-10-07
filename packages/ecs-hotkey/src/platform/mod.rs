@@ -20,26 +20,6 @@ pub use windows::*;
 #[cfg(target_os = "linux")]
 pub use linux_wayland::*;
 
-/// Platform-specific hotkey initialization
-pub fn init_platform_hotkeys() -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        macos::init_macos_hotkey_system().map_err(|e| e.to_string())?;
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        windows::init_windows_hotkeys().map_err(|e| e.to_string())?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        linux::init_linux_hotkeys().map_err(|e| e.to_string())?;
-    }
-    
-    Ok(())
-}
-
 /// Check platform-specific permissions and requirements
 pub fn check_platform_permissions() -> Result<(), String> {
     #[cfg(target_os = "macos")]

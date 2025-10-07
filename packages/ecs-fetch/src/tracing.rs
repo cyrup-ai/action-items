@@ -54,7 +54,7 @@ impl Default for HttpTracingConfig {
 }
 
 /// HTTP request tracing manager
-#[derive(Debug, Resource)]
+#[derive(Debug, Default, Resource)]
 pub struct HttpTracingManager {
     /// Active request spans
     pub active_spans: HashMap<HttpOperationId, RequestSpan>,
@@ -64,30 +64,25 @@ pub struct HttpTracingManager {
     pub stats: TracingStats,
 }
 
-impl Default for HttpTracingManager {
-    fn default() -> Self {
-        Self {
-            active_spans: HashMap::new(),
-            correlation_mapping: HashMap::new(),
-            stats: TracingStats::default(),
-        }
-    }
+/// Parameters for starting a request trace - reduces argument count
+pub struct RequestTraceParams<'a> {
+    pub operation_id: HttpOperationId,
+    pub correlation_id: CorrelationId,
+    pub method: &'a Method,
+    pub url: &'a str,
+    pub headers: &'a reqwest::header::HeaderMap,
+    pub body_size: Option<usize>,
+    pub config: &'a HttpTracingConfig,
 }
 
 impl HttpTracingManager {
     /// Start tracing for HTTP request
     pub fn start_request_trace(
         &mut self,
-        operation_id: HttpOperationId,
-        correlation_id: CorrelationId,
-        method: &Method,
-        url: &str,
-        headers: &reqwest::header::HeaderMap,
-        body_size: Option<usize>,
-        config: &HttpTracingConfig,
+        params: RequestTraceParams<'_>,
     ) -> Option<Span> {
         // Check sampling
-        if !self.should_sample(config) {
+        if !self.should_sample(params.config) {
             return None;
         }
 
@@ -95,14 +90,14 @@ impl HttpTracingManager {
         let span = span!(
             Level::INFO,
             "http_request",
-            operation_id = %operation_id,
-            correlation_id = %correlation_id,
-            http.method = %method,
-            http.url = %url,
-            http.scheme = self.extract_scheme(url),
-            http.host = self.extract_host(url),
-            http.path = self.extract_path(url),
-            http.user_agent = self.extract_header(headers, "user-agent"),
+            operation_id = %params.operation_id,
+            correlation_id = %params.correlation_id,
+            http.method = %params.method,
+            http.url = %params.url,
+            http.scheme = self.extract_scheme(params.url),
+            http.host = self.extract_host(params.url),
+            http.path = self.extract_path(params.url),
+            http.user_agent = self.extract_header(params.headers, "user-agent"),
             otel.kind = "client",
             otel.status_code = tracing::field::Empty,
             otel.status_description = tracing::field::Empty,
@@ -110,30 +105,30 @@ impl HttpTracingManager {
 
         // Log request details
         span.in_scope(|| {
-            info!("Starting HTTP request: {} {}", method, url);
+            info!("Starting HTTP request: {} {}", params.method, params.url);
 
             // Log headers if enabled
-            if config.log_headers {
-                self.log_request_headers(headers, config);
+            if params.config.log_headers {
+                self.log_request_headers(params.headers, params.config);
             }
 
             // Log body size
-            if let Some(size) = body_size {
+            if let Some(size) = params.body_size {
                 debug!("Request body size: {} bytes", size);
             }
         });
 
         // Store span for later completion
-        self.active_spans.insert(operation_id, RequestSpan {
+        self.active_spans.insert(params.operation_id, RequestSpan {
             span: span.clone(),
             started_at: Instant::now(),
-            method: method.clone(),
-            url: url.to_string(),
-            correlation_id,
+            method: params.method.clone(),
+            url: params.url.to_string(),
+            correlation_id: params.correlation_id,
         });
 
         self.correlation_mapping
-            .insert(correlation_id, operation_id);
+            .insert(params.correlation_id, params.operation_id);
         self.stats.traces_started += 1;
 
         Some(span)
@@ -587,15 +582,15 @@ mod tests {
         let headers = reqwest::header::HeaderMap::new();
 
         // Start trace
-        let span = manager.start_request_trace(
+        let span = manager.start_request_trace(RequestTraceParams {
             operation_id,
             correlation_id,
-            &Method::GET,
-            "https://example.com/api",
-            &headers,
-            None,
-            &config,
-        );
+            method: &Method::GET,
+            url: "https://example.com/api",
+            headers: &headers,
+            body_size: None,
+            config: &config,
+        });
 
         assert!(span.is_some());
         assert_eq!(manager.active_spans.len(), 1);
@@ -668,11 +663,12 @@ mod tests {
 
     #[test]
     fn test_tracing_stats() {
-        let mut stats = TracingStats::default();
-        stats.traces_started = 100;
-        stats.traces_completed = 80;
-        stats.traces_failed = 15;
-        stats.traces_expired = 2;
+        let stats = TracingStats {
+            traces_started: 100,
+            traces_completed: 80,
+            traces_failed: 15,
+            traces_expired: 2,
+        };
 
         assert_eq!(stats.success_rate(), 80.0 / 95.0);
         assert_eq!(stats.active_traces(), 3);

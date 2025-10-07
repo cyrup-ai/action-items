@@ -213,13 +213,13 @@ fn test_runtime_algorithm_selection() {
     for algorithm in algorithms {
         let compressed = manager
             .compress_with_algorithm(test_data.clone(), algorithm)
-            .expect(&format!("Compression with {:?} failed", algorithm));
-        
+            .unwrap_or_else(|_| panic!("Compression with {:?} failed", algorithm));
+
         assert_eq!(compressed.algorithm, algorithm, "Algorithm mismatch in compressed data");
-        
+
         let decompressed = manager
             .decompress_sync(&compressed)
-            .expect(&format!("Decompression with {:?} failed", algorithm));
+            .unwrap_or_else(|_| panic!("Decompression with {:?} failed", algorithm));
         
         assert_eq!(test_data, decompressed, "Data mismatch after {:?} roundtrip", algorithm);
     }

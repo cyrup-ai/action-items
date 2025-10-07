@@ -6,6 +6,7 @@
 // Import real ECS service events
 use action_items_ecs_clipboard::{ClipboardRequest, ClipboardResponse};
 use action_items_ecs_permissions::{PermissionRequest, PermissionChanged};
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::tasks::{block_on, futures_lite::future};
 use ecs_service_bridge::events::{PluginMessageEvent, MessagePriority};
@@ -21,6 +22,15 @@ use super::payload_parsing::{
     parse_permission_type, validate_clipboard_data
 };
 
+/// SystemParam grouping service event writers to reduce function parameter count
+#[derive(SystemParam)]
+pub struct ServiceEventWriters<'w> {
+    clipboard_writer: EventWriter<'w, ClipboardRequest>,
+    notification_writer: EventWriter<'w, ecs_notifications::components::platform::NotificationRequest>,
+    permission_writer: EventWriter<'w, PermissionRequest>,
+    plugin_message_writer: EventWriter<'w, PluginMessageEvent>,
+}
+
 /// System to route plugin messages to appropriate ECS services
 /// Following the pattern from ecs-service-bridge's process_plugin_messages_system
 pub fn plugin_message_router_system(
@@ -29,12 +39,7 @@ pub fn plugin_message_router_system(
     mut state: ResMut<ServiceBridgeState>,
     mut entity_map: ResMut<PluginEntityMap>,
     mut commands: Commands,
-    mut clipboard_writer: EventWriter<ClipboardRequest>,
-    mut notification_writer: EventWriter<
-        ecs_notifications::components::platform::NotificationRequest,
-    >,
-    mut permission_writer: EventWriter<PermissionRequest>,
-    mut plugin_message_writer: EventWriter<PluginMessageEvent>,
+    mut writers: ServiceEventWriters,
 ) {
     for message in plugin_messages.read() {
         state.messages_processed += 1;
@@ -70,7 +75,7 @@ pub fn plugin_message_router_system(
                     format: action_items_ecs_clipboard::ClipboardFormat::Text,
                     requester: requester_entity,
                 };
-                clipboard_writer.write(clipboard_request);
+                writers.clipboard_writer.write(clipboard_request);
                 state.messages_routed += 1;
                 debug!("Routed clipboard read request to ecs-clipboard service");
             },
@@ -99,7 +104,7 @@ pub fn plugin_message_router_system(
                             request_id: message.request_id.clone(),
                             correlation_id: Some(operation_id.to_string()),
                         };
-                        plugin_message_writer.write(error_response);
+                        writers.plugin_message_writer.write(error_response);
                         continue;
                     }
                 };
@@ -124,7 +129,7 @@ pub fn plugin_message_router_system(
                             request_id: message.request_id.clone(),
                             correlation_id: Some(operation_id.to_string()),
                         };
-                        plugin_message_writer.write(error_response);
+                        writers.plugin_message_writer.write(error_response);
                         continue;
                     }
                 };
@@ -133,7 +138,7 @@ pub fn plugin_message_router_system(
                     data: action_items_ecs_clipboard::ClipboardData::Text(validated_data),
                     requester: requester_entity,
                 };
-                clipboard_writer.write(clipboard_request);
+                writers.clipboard_writer.write(clipboard_request);
                 state.messages_routed += 1;
                 debug!("Routed clipboard write request to ecs-clipboard service");
             },
@@ -141,7 +146,7 @@ pub fn plugin_message_router_system(
                 let clipboard_request = ClipboardRequest::Clear {
                     requester: requester_entity,
                 };
-                clipboard_writer.write(clipboard_request);
+                writers.clipboard_writer.write(clipboard_request);
                 state.messages_routed += 1;
                 debug!("Routed clipboard clear request to ecs-clipboard service");
             },
@@ -169,7 +174,7 @@ pub fn plugin_message_router_system(
                         options: ecs_notifications::DeliveryOptions::default(),
                         correlation_id: operation_id.to_string(),
                     };
-                notification_writer.write(notification_request);
+                writers.notification_writer.write(notification_request);
                 state.messages_routed += 1;
                 debug!("Routed notification request to ecs-notifications service with title '{}' and body '{}'", title, body);
             },
@@ -198,7 +203,7 @@ pub fn plugin_message_router_system(
                             request_id: message.request_id.clone(),
                             correlation_id: Some(operation_id.to_string()),
                         };
-                        plugin_message_writer.write(error_response);
+                        writers.plugin_message_writer.write(error_response);
                         continue;
                     }
                 };
@@ -223,7 +228,7 @@ pub fn plugin_message_router_system(
                             request_id: message.request_id.clone(),
                             correlation_id: Some(operation_id.to_string()),
                         };
-                        plugin_message_writer.write(error_response);
+                        writers.plugin_message_writer.write(error_response);
                         continue;
                     }
                 };
@@ -231,7 +236,7 @@ pub fn plugin_message_router_system(
                 let permission_request = PermissionRequest {
                     typ: permission_type,
                 };
-                permission_writer.write(permission_request);
+                writers.permission_writer.write(permission_request);
                 state.messages_routed += 1;
                 debug!("Routed permission request to ecs-permissions service");
             },
@@ -254,7 +259,7 @@ pub fn plugin_message_router_system(
                     request_id: message.request_id.clone(),
                     correlation_id: Some(operation_id.to_string()),
                 };
-                plugin_message_writer.write(error_response);
+                writers.plugin_message_writer.write(error_response);
                 continue;
             },
         }
@@ -547,7 +552,7 @@ fn handle_clipboard_check_format_response(
 /// Handle clipboard available formats operation response
 fn handle_clipboard_formats_response(
     requester: Entity,
-    result: &Vec<action_items_ecs_clipboard::ClipboardFormat>,
+    result: &[action_items_ecs_clipboard::ClipboardFormat],
     correlation: &mut PluginMessageCorrelation,
     plugin_writer: &mut EventWriter<PluginMessageEvent>,
     entity_map: &PluginEntityMap,
@@ -688,7 +693,7 @@ pub fn async_task_handler_system(
                 "error": "Task timed out after maximum duration"
             }),
             timestamp: TimeStamp::now(),
-            plugin_id: plugin_id,
+            plugin_id,
             priority: MessagePriority::default(),
             request_id: Some(operation_id.to_string()),
             correlation_id: Some(operation_id.to_string()),
@@ -716,7 +721,7 @@ pub fn async_task_handler_system(
                 "error": "Task failed during execution"
             }),
             timestamp: TimeStamp::now(),
-            plugin_id: plugin_id,
+            plugin_id,
             priority: MessagePriority::default(),
             request_id: Some(operation_id.to_string()),
             correlation_id: Some(operation_id.to_string()),

@@ -263,18 +263,10 @@ pub enum ResponseTransform {
 }
 
 /// Middleware processor for applying transformations
-#[derive(Debug, Resource)]
+#[derive(Debug, Default, Resource)]
 pub struct MiddlewareProcessor {
     /// Processing statistics
     pub stats: MiddlewareStats,
-}
-
-impl Default for MiddlewareProcessor {
-    fn default() -> Self {
-        Self {
-            stats: MiddlewareStats::default(),
-        }
-    }
 }
 
 impl MiddlewareProcessor {
@@ -460,11 +452,12 @@ impl MiddlewareProcessor {
                 if *log_headers {
                     debug!("Response headers: {:?}", response_headers);
                 }
-                if *log_body && response_body.is_some() {
-                    let body = response_body.as_ref().unwrap();
-                    let log_length = (*max_body_length).min(body.len());
-                    let body_preview = String::from_utf8_lossy(&body[..log_length]);
-                    debug!("Response body preview: {}", body_preview);
+                if *log_body {
+                    if let Some(body) = response_body.as_ref() {
+                        let log_length = (*max_body_length).min(body.len());
+                        let body_preview = String::from_utf8_lossy(&body[..log_length]);
+                        debug!("Response body preview: {}", body_preview);
+                    }
                 }
             },
             ResponseMiddleware::Transform(_transform) => {
