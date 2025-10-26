@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::error::{Error, Result, SecurityError};
-use crate::plugins::interface::manifest::PluginManifest;
+use crate::plugins::interface::PluginManifest;
 use sha2::{Digest, Sha256};
 use tracing::info;
 
@@ -153,16 +153,17 @@ fn remove_signature_fields(value: &mut serde_json::Value) {
 fn canonicalize_value(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(map) => {
-            for val in map.values_mut() {
-                canonicalize_value(val);
+            let mut keys: Vec<String> = map.keys().cloned().collect();
+            keys.sort();
+
+            let mut ordered = serde_json::Map::with_capacity(keys.len());
+            for key in keys {
+                if let Some(mut val) = map.remove(&key) {
+                    canonicalize_value(&mut val);
+                    ordered.insert(key, val);
+                }
             }
-            let mut entries: Vec<_> = map.drain().collect();
-            entries.sort_by(|a, b| a.0.cmp(&b.0));
-            let mut ordered = serde_json::Map::with_capacity(entries.len());
-            for (key, mut val) in entries {
-                canonicalize_value(&mut val);
-                ordered.insert(key, val);
-            }
+
             *map = ordered;
         },
         serde_json::Value::Array(items) => {

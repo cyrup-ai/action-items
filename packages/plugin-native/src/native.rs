@@ -13,7 +13,7 @@ pub trait NativePlugin: Send + Sync {
     /// Initialize plugin with context
     fn initialize(
         &mut self,
-        context: PluginContext,
+        _context: PluginContext,
         task_pool: &AsyncComputeTaskPool,
     ) -> Task<Result<(), Error>>;
 
@@ -21,7 +21,7 @@ pub trait NativePlugin: Send + Sync {
     fn execute_command(
         &mut self,
         command_id: String,
-        context: PluginContext,
+        _context: PluginContext,
         args: Option<Value>, // Or HashMap<String, Value> if preferred
         task_pool: &AsyncComputeTaskPool,
     ) -> Task<Result<Option<Value>, Error>>;
@@ -30,7 +30,7 @@ pub trait NativePlugin: Send + Sync {
     fn search(
         &self, // Typically &self for search, unless it needs to mutate state
         query: String,
-        context: PluginContext,
+        _context: PluginContext,
         task_pool: &AsyncComputeTaskPool,
     ) -> Task<Result<Vec<ActionItem>, Error>>;
 
@@ -38,7 +38,7 @@ pub trait NativePlugin: Send + Sync {
     fn execute_action(
         &mut self,
         action_id: String,
-        context: PluginContext,
+        _context: PluginContext,
         args: Option<Value>, // Or HashMap<String, Value>
         task_pool: &AsyncComputeTaskPool,
     ) -> Task<Result<Option<Value>, Error>>;
@@ -46,7 +46,7 @@ pub trait NativePlugin: Send + Sync {
     /// Background refresh (if supported)
     fn background_refresh(
         &mut self,
-        context: PluginContext,
+        _context: PluginContext,
         task_pool: &AsyncComputeTaskPool,
     ) -> Task<Result<(), Error>> {
         task_pool.spawn(async move {

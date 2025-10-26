@@ -46,7 +46,6 @@ pub mod system_hotkeys;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use ecs_preferences::HotkeyCaptureUIState;
 pub use capture::*;
 pub use components::*;
 pub use conflict::*;
@@ -219,7 +218,6 @@ impl Plugin for HotkeyPlugin {
         app
         .insert_resource(HotkeyRegistry::default())
         .insert_resource(HotkeyCaptureState::default())
-        .insert_resource(HotkeyCaptureUIState::default())
         .insert_resource(MultiCaptureState::default())
         .insert_resource(HotkeyMetrics::default())
         .insert_resource(HotkeyPreferences::default())
@@ -257,6 +255,12 @@ impl Plugin for HotkeyPlugin {
         #[cfg(target_os = "macos")]
         app.add_systems(Startup, crate::platform::macos::setup_macos_hotkey_system);
 
+        #[cfg(all(target_os = "windows", feature = "custom-windows"))]
+        app.add_systems(Startup, crate::platform::windows_hooks::setup_windows_hotkey_system);
+
+        #[cfg(all(target_os = "linux", feature = "custom-linux"))]
+        app.add_systems(Startup, crate::platform::linux_xrecord::setup_linux_hotkey_system);
+
         // Display platform-specific hotkey information at startup
         app.add_systems(Startup, display_platform_hotkey_info_system);
 
@@ -283,8 +287,20 @@ impl Plugin for HotkeyPlugin {
                 // Hotkey detection and polling - platform-specific
                 #[cfg(target_os = "macos")]
                 (crate::platform::macos::process_macos_hotkey_events_system,).in_set(HotkeySystemSet::Detection),
+
+                #[cfg(all(target_os = "windows", feature = "custom-windows"))]
+                (crate::platform::windows_hooks::process_windows_hotkey_events_system,).in_set(HotkeySystemSet::Detection),
+
+                #[cfg(all(target_os = "linux", feature = "custom-linux"))]
+                (crate::platform::linux_xrecord::process_linux_hotkey_events_system,).in_set(HotkeySystemSet::Detection),
                 #[cfg(target_os = "macos")]
                 (crate::platform::macos::register_hotkey_with_macos_system,).in_set(HotkeySystemSet::Registration),
+
+                #[cfg(all(target_os = "windows", feature = "custom-windows"))]
+                (crate::platform::windows_hooks::register_hotkey_with_windows_system,).in_set(HotkeySystemSet::Registration),
+
+                #[cfg(all(target_os = "linux", feature = "custom-linux"))]
+                (crate::platform::linux_xrecord::register_hotkey_with_linux_system,).in_set(HotkeySystemSet::Registration),
                 #[cfg(target_os = "linux")]
                 (poll_wayland_hotkey_events_system,).in_set(HotkeySystemSet::Detection),
                 (process_hotkey_pressed_events_system,).in_set(HotkeySystemSet::EventProcessing),

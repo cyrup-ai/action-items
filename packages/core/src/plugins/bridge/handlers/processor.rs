@@ -59,7 +59,8 @@ impl WasmRuntime {
                     "plugin_id": self.plugin_id,
                     "timestamp": "init_complete"
                 });
-                serde_json::to_vec(&init_response).map_err(|e| e.to_string())?
+                let bytes = serde_json::to_vec(&init_response).map_err(|e| e.to_string())?;
+                Ok(bytes)
             },
             "cleanup" => {
                 // Cleanup plugin resources
@@ -67,7 +68,8 @@ impl WasmRuntime {
                     "status": "cleaned_up",
                     "plugin_id": self.plugin_id
                 });
-                serde_json::to_vec(&cleanup_response).map_err(|e| e.to_string())?
+                let bytes = serde_json::to_vec(&cleanup_response).map_err(|e| e.to_string())?;
+                Ok(bytes)
             },
             "validate_input" => {
                 // Validate input data

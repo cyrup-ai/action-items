@@ -5,7 +5,7 @@ use action_items_ecs_permissions::{PermissionManager, PermissionStatus, Permissi
 use tracing::{debug, info};
 
 use crate::error::{Error, Result, SecurityError};
-use crate::plugins::interface::manifest::{PluginManifest, PluginPermissions};
+use crate::plugins::interface::{PluginManifest, PluginPermissions};
 
 /// Performs OS-level permission verification based on plugin manifest declarations.
 pub struct OsPermissionChecker {

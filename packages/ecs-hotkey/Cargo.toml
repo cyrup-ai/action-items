@@ -27,10 +27,21 @@ objc2-core-graphics = "0.3"
 dashmap = "6.1"
 once_cell = "1.20"
 
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Foundation"
+] }
+dashmap = "6.1"
+
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "4", default-features = false, features = ["tokio"] }
 async-trait = "0.1"
 futures-util = "0.3"
+
+x11rb = { version = "0.13", features = ["record", "xtest"] }
+dashmap = "6.1"
 
 # Re-enable warnings for this workspace package
 [lints]
@@ -43,3 +54,10 @@ unused_variables = "warn"
 unused_mut = "warn"
 dead_code = "warn"
 deprecated = "warn"
+
+[features]
+default = []
+
+custom-windows = []
+custom-linux = []
+

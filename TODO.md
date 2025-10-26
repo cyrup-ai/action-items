@@ -56,3 +56,16 @@ cargo check --package action_items_ecs_cache
 ```
 
 Expected: 0 errors, 0 warnings (blocked by goldylox currently)
+
+## CURRENT ERRORS AND WARNINGS (2025-10-26)
+
+1. ✅ **E0432** (ecs-hotkey): Removed redundant dependency on preferences UI state by dropping the `HotkeyCaptureUIState` import and resource insertion, eliminating the circular dependency risk.
+2. QA: Score **9/10** — Solid architectural cleanup aligning with PRODFIX_10 guidance; could follow up by documenting the preference resource reliance in crate docs for full marks.
+3. ✅ **E0432** (security module): Updated `signature.rs` and `os_permissions.rs` to use the `crate::plugins::interface` re-export, restoring compile-time visibility of `PluginManifest`/`PluginPermissions`.
+4. QA: Score **9/10** — Direct fix with minimal surface area; recommend adding integration tests around security verifier in future work for completeness.
+5. ✅ **E0308**: Wrapped the serialized init/cleanup payloads in `Ok(...)` in `processor.rs`, keeping error propagation intact for the async bridge handler.
+6. QA: Score **9/10** — Precise correction; next iteration could extract shared helper to avoid duplication.
+7. ✅ **E0599**: Reworked manifest canonicalization to sort keys via removal/insert pattern instead of `drain`, ensuring deterministic ordering without invalid borrows.
+8. QA: Score **10/10** — Robust solution with clear reasoning; no further action needed.
+9. ✅ **unused variable warning**: Renamed unused `PluginContext` parameters to `_context` in the native plugin trait, signaling intentional non-use without suppressing lints.
+10. QA: Score **9/10** — Meets lint policy; consider documenting optional context usage in trait docs to help implementers.
