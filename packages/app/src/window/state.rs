@@ -5,7 +5,7 @@
 use bevy::prelude::*;
 use bevy::window::{MonitorSelection, WindowMode};
 
-use crate::window::errors::{ViewportError, WindowModeError};
+use crate::window::errors::WindowModeError;
 use crate::window::positioning::ScreenDimensions;
 
 /// Window animation states
@@ -68,84 +68,6 @@ impl ViewportState {
             self.last_update = std::time::Instant::now();
         }
     }
-
-    /// Convert pixel width to viewport width percentage
-    /// Blazing-fast zero-allocation conversion using pre-calculated ratios
-    #[inline]
-    pub fn pixels_to_vw(&self, pixels: f32) -> f32 {
-        pixels * self.width_ratio
-    }
-
-    /// Convert pixel height to viewport height percentage  
-    /// Blazing-fast zero-allocation conversion using pre-calculated ratios
-    #[inline]
-    pub fn pixels_to_vh(&self, pixels: f32) -> f32 {
-        pixels * self.height_ratio
-    }
-
-    /// Validate viewport state for debugging
-    /// Returns true if state appears valid and up-to-date
-    #[inline]
-    pub fn is_valid(&self) -> bool {
-        self.logical_width > 0.0
-            && self.logical_height > 0.0
-            && self.scale_factor > 0.0
-            && self.width_ratio > 0.0
-            && self.height_ratio > 0.0
-    }
-}
-
-/// Screen-to-viewport conversion function with comprehensive error handling
-/// Translates pixel dimensions to Bevy Val::Vw/Vh units with DPI awareness
-/// Uses pre-calculated ratios for zero-allocation performance
-#[inline]
-pub fn screen_to_viewport(
-    pixel_width: f32,
-    pixel_height: f32,
-    viewport_state: &ViewportState,
-) -> Result<(Val, Val), ViewportError> {
-    // Validate inputs and viewport state
-    if pixel_width < 0.0 || pixel_height < 0.0 {
-        return Err(ViewportError::NegativeDimensions {
-            width: pixel_width,
-            height: pixel_height,
-        });
-    }
-
-    if !viewport_state.is_valid() {
-        return Err(ViewportError::InvalidViewportState);
-    }
-
-    // Convert to viewport percentages using pre-calculated ratios
-    let vw_percent = viewport_state.pixels_to_vw(pixel_width);
-    let vh_percent = viewport_state.pixels_to_vh(pixel_height);
-
-    // Clamp to reasonable bounds (0-200% for extreme edge cases)
-    let vw_clamped = vw_percent.clamp(0.0, 200.0);
-    let vh_clamped = vh_percent.clamp(0.0, 200.0);
-
-    Ok((Val::Vw(vw_clamped), Val::Vh(vh_clamped)))
-}
-
-/// Convert bevy window dimensions to viewport units for responsive UI calculations
-/// Uses all the ViewportState methods for comprehensive dimension validation
-#[inline]
-pub fn convert_window_to_viewport_units(
-    window_width: f32,
-    window_height: f32,
-    viewport_state: &ViewportState,
-) -> Result<(f32, f32), ViewportError> {
-    // Validate the viewport state before proceeding
-    if !viewport_state.is_valid() {
-        return Err(ViewportError::ValidationFailed);
-    }
-
-    // Convert pixel dimensions to viewport percentages
-    let vw_percent = viewport_state.pixels_to_vw(window_width);
-    let vh_percent = viewport_state.pixels_to_vh(window_height);
-
-    // Return the viewport percentages for use in responsive calculations
-    Ok((vw_percent, vh_percent))
 }
 
 /// Resource to track window visibility and sizing

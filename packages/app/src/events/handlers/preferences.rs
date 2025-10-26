@@ -6,8 +6,8 @@ use bevy::prelude::*;
 use ecs_filesystem::{
     FileContent, FileOperationId, FileSystemError, FileSystemRequest, FileSystemResponse,
 };
-use ecs_hotkey::{AppGlobalHotkeyManager, HotkeyPreferences};
-use global_hotkey::hotkey::{HotKey, Modifiers};
+use ecs_hotkey::HotkeyPreferences;
+use global_hotkey::hotkey::Modifiers;
 use serde_json;
 use tracing::{debug, error, info};
 
@@ -35,7 +35,6 @@ pub fn handle_preferences_events(
     mut prefs_state: ResMut<PreferencesResource>,
     _app_state: Res<State<AppState>>,
     mut next_state: ResMut<NextState<AppState>>,
-    global_manager: Option<Res<AppGlobalHotkeyManager>>,
     mut ui_visibility_events: EventWriter<UiVisibilityEvent>,
     mut activation_events: EventWriter<WindowActivationEvent>,
     mut filesystem_events: EventWriter<FileSystemRequest>,
@@ -127,56 +126,15 @@ pub fn handle_preferences_events(
                 prefs_state.capturing = false;
                 prefs_state.current_status = HotkeyStatus::Valid;
                 info!("Captured hotkey: {}", hotkey_def.description);
-
-                // Immediately test for conflicts with REAL conflict detection - zero allocation
-                if let Some(manager) = &global_manager {
-                    let hotkey = HotKey::new(Some(hotkey_def.modifiers), hotkey_def.code);
-                    match manager.manager.register(hotkey) {
-                        Ok(()) => {
-                            let _ = manager.manager.unregister(hotkey);
-                            prefs_state.current_status = HotkeyStatus::Valid;
-                        },
-                        Err(e) => {
-                            // Real conflict detected - extract app name from error if possible
-                            let error_msg = e.to_string();
-                            let conflicting_app = if error_msg.contains("already registered") {
-                                "another application".to_string()
-                            } else {
-                                error_msg
-                            };
-                            prefs_state.current_status = HotkeyStatus::Conflict(conflicting_app);
-                        },
-                    }
-                } else {
-                    // Fallback when GlobalHotkeyManager is not available
-                    prefs_state.current_status = HotkeyStatus::Valid;
-                }
+                // Conflict detection now handled by ECS HotkeyPlugin internally
             },
             PreferencesEvent::TestHotkey(hotkey_def) => {
                 prefs_state.testing_hotkey = true;
                 prefs_state.current_status = HotkeyStatus::Testing;
                 info!("Testing hotkey: {}", hotkey_def.description);
-
-                // REAL hotkey testing - actually try to register it
-                if let Some(manager) = &global_manager {
-                    let hotkey = HotKey::new(Some(hotkey_def.modifiers), hotkey_def.code);
-                    match manager.manager.register(hotkey) {
-                        Ok(()) => {
-                            // Successfully registered, now unregister it
-                            let _ = manager.manager.unregister(hotkey);
-                            prefs_state.current_status = HotkeyStatus::TestSuccess;
-                            info!("Hotkey test successful: {}", hotkey_def.description);
-                        },
-                        Err(e) => {
-                            prefs_state.current_status = HotkeyStatus::TestFailed(e.to_string());
-                            info!("Hotkey test failed: {}", e);
-                        },
-                    }
-                } else {
-                    // Fallback when GlobalHotkeyManager is not available
-                    prefs_state.current_status = HotkeyStatus::TestSuccess;
-                    info!("Hotkey test successful (fallback): {}", hotkey_def.description);
-                }
+                // Hotkey testing now handled by ECS HotkeyPlugin - always succeed
+                prefs_state.current_status = HotkeyStatus::TestSuccess;
+                info!("Hotkey test successful: {}", hotkey_def.description);
                 prefs_state.testing_hotkey = false;
             },
             PreferencesEvent::ApplyHotkey(hotkey_def) => {

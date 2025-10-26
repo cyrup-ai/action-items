@@ -4,7 +4,6 @@ use bevy::ecs::world::CommandQueue;
 use bevy::prelude::*;
 use bevy::tasks::futures_lite::future;
 use bevy::tasks::{AsyncComputeTaskPool, Task, block_on};
-use futures::FutureExt;
 use std::panic::AssertUnwindSafe;
 use tracing::{debug, error, info, warn};
 
@@ -38,11 +37,18 @@ impl Plugin for DatabasePlugin {
                 
                 debug!("Database async task started with timeout and panic catching");
                 
-                // Wrap entire database initialization in panic catching (remove timeout for Bevy compatibility)
-                let initialization_result = AssertUnwindSafe(async move {
-                    debug!("Attempting database service creation");
-                    DatabaseService::new(config).await
-                }).catch_unwind().await;
+                // SurrealDB requires Tokio runtime context - create one for initialization
+                // AsyncComputeTaskPool uses async-executor, not Tokio, so we must explicitly provide context
+                let initialization_result = std::panic::catch_unwind(|| {
+                    debug!("Creating Tokio runtime for SurrealDB initialization");
+                    let runtime = tokio::runtime::Runtime::new()
+                        .expect("Failed to create Tokio runtime for database");
+                    
+                    debug!("Attempting database service creation within Tokio runtime");
+                    runtime.block_on(async move {
+                        DatabaseService::new(config).await
+                    })
+                });
                 
                 // Handle all possible outcomes: success, error, panic  
                 match initialization_result {

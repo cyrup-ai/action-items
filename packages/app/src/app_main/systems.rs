@@ -1,7 +1,6 @@
 use bevy::prelude::*;
 
 use super::events::bridge_preferences_to_settings;
-use super::hotkey_setup::setup_global_hotkey_callback;
 use super::window_config::configure_non_activating_panel;
 use super::window_resize::handle_window_resized_system;
 use crate::events::handlers::preferences::{
@@ -9,7 +8,7 @@ use crate::events::handlers::preferences::{
 };
 // Removed custom storage system imports - now using ecs-filesystem service
 use crate::events::{
-    detect_preferences_command, handle_execute_commands, handle_global_hotkeys,
+    detect_preferences_command, handle_execute_commands,
     handle_launcher_events, handle_preferences_events, handle_preferences_ui_interactions,
     real_hotkey_capture_system, update_current_query_from_events,
 };
@@ -138,8 +137,6 @@ pub fn add_post_startup_systems(app: &mut App) {
             setup_ui_target_camera,
             // Set initial focus after UI is set up
             set_initial_text_focus_system, // Focus system still needed
-            // Move hotkey setup to PostStartup to avoid CommandQueue issues
-            setup_global_hotkey_callback,
         ),
     );
 }
@@ -155,8 +152,7 @@ pub fn add_update_systems(app: &mut App) {
             debug_monitor_info_system,
             position_ui_on_correct_monitor,
             update_ui_monitor_positioning,
-            #[cfg(debug_assertions)]
-            crate::window::systems::debug_viewport_calculations_system,
+            // Removed debug_viewport_calculations_system - useless system that just logged trivial math every frame
         ),
     );
 
@@ -167,8 +163,6 @@ pub fn add_update_systems(app: &mut App) {
             // ECS hotkey service integration
             handle_hotkey_registration_system,
             handle_launcher_hotkey_press_system,
-            // Event-driven global input (no polling!) - runs first
-            handle_global_hotkeys,
             // Focus management systems - run before input processing
             (
                 handle_keyboard_focus_navigation_system,

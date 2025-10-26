@@ -1,19 +1,16 @@
 //! First-Run Detection and Wizard Auto-Start
 //!
-//! High-performance first-run detection using ecs-filesystem for async file operations.
-//! Manages wizard completion persistence and auto-start logic with zero blocking operations.
-
-#![allow(dead_code)]
+//! Detects first-run by querying actual OS permission status.
+//! No file persistence - OS is the single source of truth.
 
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
 use std::time::SystemTime;
 use tracing::{error, info, warn};
 
-use crate::types::PermissionType;
+use crate::types::{PermissionType, PermissionStatus};
+use crate::plugin::PermissionResource;
 use crate::wizard::{WizardState, WizardStartRequest, WizardCompleteEvent};
+use crate::wizard::plugin::WizardRequiredPermissions;
 
 /// Resource for tracking first-run detection state
 #[derive(Resource)]
@@ -76,47 +73,13 @@ impl FirstRunDetector {
         warn!("First-run detection error: {}", error);
     }
     
-    /// Apply completion status from file
-    pub fn apply_completion_status(&mut self, status: WizardCompletionStatus) {
-        self.wizard_completed = status.completed;
-        self.completion_timestamp = status.completed_at;
-        self.is_first_run = !status.completed;
-        self.check_completed = true;
-        self.is_loading = false;
-        
-        if status.completed {
-            info!("Applied wizard completion status from file");
-        } else {
-            info!("Applied first-run status from file");
-        }
-    }
-    
-    /// Save partial wizard progress for resumption
+    /// Log partial wizard progress (no persistence per requirements)
     pub fn save_partial_progress(&mut self, progress: WizardPartialProgress) {
-        info!("Saving partial progress: {} permissions completed", progress.completed_permissions.len());
-        // Note: Actual file persistence would go here
-        // For now, just log - file operations need ecs-filesystem integration
-    }
-    
-    /// Load partial wizard progress if available
-    pub fn load_partial_progress(&self) -> Option<WizardPartialProgress> {
-        // Note: Actual file loading would go here
-        None
+        info!("Wizard progress: {} permissions completed (not persisted - OS is source of truth)", 
+              progress.completed_permissions.len());
+        // Intentionally does not persist - OS permission status is queried on each startup
     }
 }
-
-/// Simplified wizard completion status for persistence
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
-pub struct WizardCompletionStatus {
-    /// Whether the wizard has been completed
-    pub completed: bool,
-    /// Timestamp when completed (if applicable)
-    pub completed_at: Option<SystemTime>,
-    /// Summary of completion results
-    pub summary: Option<SerializableWizardSummary>,
-}
-
 
 /// Partial wizard progress for resumption
 #[derive(Debug, Clone)]
@@ -127,88 +90,63 @@ pub struct WizardPartialProgress {
     pub can_resume: bool,
 }
 
-impl WizardCompletionStatus {
-    /// Create a completed status with summary
-    pub fn completed(summary: SerializableWizardSummary) -> Self {
-        Self {
-            completed: true,
-            completed_at: Some(SystemTime::now()),
-            summary: Some(summary),
-        }
-    }
-}
-
-/// Simplified wizard completion summary for serialization
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerializableWizardSummary {
-    /// Number of permissions granted
-    pub permissions_granted: u8,
-    /// Number of permissions that failed
-    pub permissions_failed: u8,
-    /// Whether hotkeys were configured
-    pub hotkeys_configured: bool,
-    /// Total duration in seconds
-    pub total_duration_secs: u64,
-}
-
-/// Resource for tracking file operations
-#[derive(Resource, Default)]
-pub struct FirstRunFileOperations {
-    /// Pending completion file read operations
-    pub completion_read_ops: HashMap<String, ()>,
-    /// Pending completion file write operations  
-    pub completion_write_ops: HashMap<String, WizardCompletionStatus>,
-    /// Pending directory creation operations
-    pub completion_dir_ops: HashMap<String, (Entity, PathBuf, Vec<u8>, WizardCompletionStatus)>,
-}
-
-/// System to initiate first-run check using ecs-filesystem
+/// System to initiate first-run check by querying actual OS permission status
 pub fn initiate_first_run_check(
     mut detector: ResMut<FirstRunDetector>,
-    _pending_ops: ResMut<FirstRunFileOperations>,
+    permission_resource: Option<Res<PermissionResource>>,
+    required_perms: Res<WizardRequiredPermissions>,
 ) {
-    // Only check once
+    // Only check once per app session
     if detector.check_completed || detector.is_loading {
         return;
     }
     
+    let Some(perm_res) = permission_resource else {
+        warn!("PermissionResource not available - cannot check permissions");
+        detector.handle_error("PermissionResource not available".to_string());
+        return;
+    };
+    
     detector.is_loading = true;
     
-    // For now, simulate a simple first-run check
-    // In a real implementation, this would check for a completion file
-    let config_dir = dirs::config_dir()
-        .map(|dir| dir.join("action-items"))
-        .unwrap_or_else(|| PathBuf::from("."));
-    let config_file = config_dir.join("wizard-completion.json");
+    // Check actual OS permission status for all required permissions
+    let mut all_granted = true;
     
-    // Check if completion file exists
-    if config_file.exists() {
-        // Try to read and parse the file
-        match std::fs::read_to_string(&config_file) {
-            Ok(content) => {
-                if content.trim().is_empty() {
-                    info!("Empty completion file - treating as first run");
-                    detector.is_first_run = true;
-                    detector.wizard_completed = false;
-                } else {
-                    match serde_json::from_str::<WizardCompletionStatus>(&content) {
-                        Ok(status) => {
-                            detector.apply_completion_status(status);
-                        },
-                        Err(e) => {
-                            warn!("Failed to parse completion file: {}", e);
-                            detector.handle_error(format!("Parse error: {}", e));
-                        },
-                    }
-                }
+    for perm_type in &required_perms.permissions {
+        match perm_res.manager.check_permission(*perm_type) {
+            Ok(PermissionStatus::Authorized) => {
+                info!("Permission {:?} is authorized", perm_type);
+            },
+            Ok(PermissionStatus::Denied) => {
+                info!("Permission {:?} is denied - wizard should show", perm_type);
+                all_granted = false;
+            },
+            Ok(PermissionStatus::NotDetermined) => {
+                info!("Permission {:?} not determined - wizard should show", perm_type);
+                all_granted = false;
+            },
+            Ok(PermissionStatus::Restricted) => {
+                warn!("Permission {:?} is restricted - wizard should show", perm_type);
+                all_granted = false;
+            },
+            Ok(PermissionStatus::Unknown) => {
+                warn!("Permission {:?} status unknown - wizard should show", perm_type);
+                all_granted = false;
             },
             Err(e) => {
-                warn!("Failed to read completion file: {}", e);
-                detector.handle_error(format!("Read error: {}", e));
+                error!("Failed to check permission {:?}: {}", perm_type, e);
+                all_granted = false;
             },
         }
+    }
+    
+    // Set detector state based on actual OS permission status
+    if all_granted {
+        info!("All required permissions granted - wizard not needed");
+        detector.is_first_run = false;
+        detector.wizard_completed = true;
     } else {
-        info!("Completion file not found - first run confirmed");
+        info!("Some permissions missing - wizard should show");
         detector.is_first_run = true;
         detector.wizard_completed = false;
     }
@@ -217,7 +155,8 @@ pub fn initiate_first_run_check(
     detector.is_loading = false;
 }
 
-/// System to handle wizard completion events and persist completion status
+/// System to handle wizard completion events
+/// No persistence needed - OS permission status is the source of truth
 pub fn handle_wizard_completion(
     mut completion_events: EventReader<WizardCompleteEvent>,
     mut detector: ResMut<FirstRunDetector>,
@@ -225,51 +164,16 @@ pub fn handle_wizard_completion(
     for event in completion_events.read() {
         info!("Processing wizard completion event");
         
-        // Convert to simplified summary for serialization
-        let summary = SerializableWizardSummary {
-            permissions_granted: event.completion_summary.granted_permissions.len() as u8,
-            permissions_failed: event.completion_summary.failed_permissions.len() as u8,
-            hotkeys_configured: event.completion_summary.hotkeys_configured,
-            total_duration_secs: event.completion_summary.total_duration.as_secs(),
-        };
-        
-        let completion_status = WizardCompletionStatus::completed(summary);
-        
-        // Update detector state
+        // Update detector state - no file persistence needed
+        // OS permission status is the source of truth
         detector.mark_wizard_completed(event.completed_at);
         
-        // Persist completion status to filesystem
-        let config_dir = dirs::config_dir()
-            .map(|dir| dir.join("action-items"))
-            .unwrap_or_else(|| PathBuf::from("."));
-        
-        // Create directory if it doesn't exist
-        if let Err(e) = std::fs::create_dir_all(&config_dir) {
-            error!("Failed to create config directory: {}", e);
-            detector.handle_error(format!("Directory creation failed: {}", e));
-            continue;
-        }
-        
-        let config_file = config_dir.join("wizard-completion.json");
-        
-        // Serialize and write completion status
-        match serde_json::to_string_pretty(&completion_status) {
-            Ok(json_content) => {
-                match std::fs::write(&config_file, json_content) {
-                    Ok(()) => {
-                        info!("Successfully saved wizard completion status");
-                    },
-                    Err(e) => {
-                        error!("Failed to write completion file: {}", e);
-                        detector.handle_error(format!("Write error: {}", e));
-                    },
-                }
-            },
-            Err(e) => {
-                error!("Failed to serialize completion status: {}", e);
-                detector.handle_error(format!("Serialization failed: {}", e));
-            },
-        }
+        info!(
+            "Wizard completed: {} permissions granted, {} failed, hotkeys_configured={}",
+            event.completion_summary.granted_permissions.len(),
+            event.completion_summary.failed_permissions.len(),
+            event.completion_summary.hotkeys_configured
+        );
     }
 }
 

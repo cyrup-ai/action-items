@@ -76,29 +76,39 @@ pub fn handle_hotkey_registration_system(
 pub fn handle_launcher_hotkey_press_system(
     mut hotkey_events: EventReader<HotkeyPressed>,
     mut launcher_events: EventWriter<LauncherEvent>,
-    _app_state: Res<State<AppState>>,
+    app_state: Res<State<AppState>>,
     mut next_state: ResMut<NextState<AppState>>,
     mut activation_events: EventWriter<WindowActivationEvent>,
 ) {
     for event in hotkey_events.read() {
         if event.binding.action == "launcher_toggle" {
             info!(
-                "Launcher hotkey pressed: {}",
-                event.binding.definition.description
+                "Launcher hotkey pressed: {} - Current state: {}",
+                event.binding.definition.description,
+                app_state.get().description()
             );
 
-            // Activate launcher
-            next_state.set(AppState::LauncherActive);
-
-            // Send launcher event
-            launcher_events.write(LauncherEvent::new(
-                action_items_core::LauncherEventType::ShowLauncher,
-            ));
-
-            // Send window activation event
-            activation_events.write(WindowActivationEvent {
-                reason: ActivationReason::GlobalHotkey,
-            });
+            match app_state.get() {
+                AppState::Background => {
+                    // Activate launcher when in background
+                    info!("Activating launcher from background");
+                    next_state.set(AppState::LauncherActive);
+                    launcher_events.write(LauncherEvent::new(
+                        action_items_core::LauncherEventType::ShowLauncher,
+                    ));
+                    activation_events.write(WindowActivationEvent {
+                        reason: ActivationReason::GlobalHotkey,
+                    });
+                },
+                AppState::LauncherActive | AppState::SearchMode | AppState::PreferencesOpen => {
+                    // Hide launcher when active
+                    info!("Hiding launcher (currently active)");
+                    next_state.set(AppState::Background);
+                    launcher_events.write(LauncherEvent::new(
+                        action_items_core::LauncherEventType::HideLauncher,
+                    ));
+                },
+            }
         }
     }
 }

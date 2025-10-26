@@ -131,11 +131,26 @@ pub struct LauncherMetrics {
 }
 
 /// Plugin registry resource
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct PluginRegistry {
     pub discovered_plugins: HashMap<String, DiscoveredPlugin>,
     pub loaded_plugins: HashMap<String, LoadedPlugin>,
     pub plugin_capabilities: HashMap<String, Vec<String>>,
+    pub last_discovery_time: Option<Instant>,
+    pub discovery_interval: Duration,
+}
+
+impl Default for PluginRegistry {
+    fn default() -> Self {
+        Self {
+            discovered_plugins: HashMap::new(),
+            loaded_plugins: HashMap::new(),
+            plugin_capabilities: HashMap::new(),
+            last_discovery_time: None,
+            // Run plugin discovery only every 60 seconds
+            discovery_interval: Duration::from_secs(60),
+        }
+    }
 }
 
 /// Loaded plugin information

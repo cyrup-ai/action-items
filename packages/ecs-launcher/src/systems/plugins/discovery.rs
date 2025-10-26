@@ -22,11 +22,25 @@ static TOTAL_PLUGINS_DISCOVERED: AtomicU64 = AtomicU64::new(0);
 pub fn discover_plugins_system(
     mut commands: Commands,
     mut _plugin_discovered: EventWriter<PluginDiscovered>,
-    _plugin_registry: ResMut<PluginRegistry>,
+    plugin_registry: Res<PluginRegistry>,
+    existing_tasks: Query<&PluginDiscoveryTask>,
     config: Res<LauncherConfig>,
 ) {
     if !config.enable_plugin_discovery {
         return;
+    }
+
+    // Prevent concurrent discovery tasks - zero-allocation check
+    if !existing_tasks.is_empty() {
+        return;
+    }
+
+    // Check if enough time has passed since last discovery
+    if let Some(last_discovery) = plugin_registry.last_discovery_time {
+        let elapsed = std::time::Instant::now().duration_since(last_discovery);
+        if elapsed < plugin_registry.discovery_interval {
+            return;
+        }
     }
 
     // Use real plugin discovery from core
@@ -334,6 +348,7 @@ struct ExtractedMetadata {
 pub fn poll_plugin_discovery_tasks(
     mut commands: Commands,
     mut plugin_tasks: Query<(Entity, &mut PluginDiscoveryTask)>,
+    mut plugin_registry: ResMut<PluginRegistry>,
     config: Res<LauncherConfig>,
 ) {
     use bevy::tasks::{block_on, poll_once};
@@ -343,6 +358,9 @@ pub fn poll_plugin_discovery_tasks(
             if config.enable_debug_logging {
                 info!("Plugin discovery task completed");
             }
+
+            // Update discovery timestamp on completion - this starts the cooldown period
+            plugin_registry.last_discovery_time = Some(std::time::Instant::now());
 
             // Apply the commands from the completed task
             commands.append(&mut command_queue);

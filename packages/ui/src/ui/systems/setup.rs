@@ -11,7 +11,7 @@ use crate::ui::components::{
     FallbackIcon, LauncherContainer, ResultsContainer,
     SearchContainer, SearchInput, SettingsContainer, UiFonts, UiRoot, ViewportResponsiveContainer,
 };
-use crate::ui::icons::LauncherIconCache;
+use crate::ui::icons::GenericIconFallbacks;
 use action_items_ecs_ui::icons::IconTheme;
 use crate::ui::systems::monitor_constraints::MonitorConstrained;
 use crate::ui::typography::TypographyScale;
@@ -68,7 +68,8 @@ pub fn setup_ui_system(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(FallbackIcon(None));
 
     // Initialize icon cache and extraction system
-    commands.insert_resource(LauncherIconCache::new());
+    // Note: IconCache is initialized by IconPlugin
+    commands.insert_resource(GenericIconFallbacks::new());
     commands.insert_resource(IconTheme::default());
 
     // Spawn viewport-responsive UI root with screen dimension integration

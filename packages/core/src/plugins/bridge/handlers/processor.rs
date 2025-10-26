@@ -8,6 +8,7 @@ use action_items_native::{
     StorageReadResponse, StorageWriteRequest, StorageWriteResponse,
 };
 use bevy::prelude::*;
+use serde_json::{json, Value};
 use log::debug;
 
 use super::super::types::{ServiceRequest, ServiceResponse};
@@ -38,8 +39,35 @@ impl WasmRuntime {
         // For now, process the data based on common WASM callback patterns
         match function_name {
             "process_data" => {
-                // Process and potentially transform the input data
-                Ok(data) // Echo back for now, but would do real processing
+                // Parse input data as JSON/binary, apply plugin logic, return transformed output
+                let input: Value = serde_json::from_slice(&data).unwrap_or(Value::Null);
+                let output = if let Value::Object(mut obj) = input {
+                    obj.insert("processed_by_bridge".to_string(), json!(true));
+                    serde_json::to_vec(&Value::Object(obj)).map_err(|e| e.to_string())?
+                } else {
+                    // For binary or invalid JSON, return original with simple header
+                    let mut output = vec![0u8, 0u8, 0u8, data.len() as u8]; // simple header with length
+                    output.extend_from_slice(&data);
+                    output
+                };
+                Ok(output)
+            },
+            "init" => {
+                // Initialize plugin
+                let init_response = json!({
+                    "status": "initialized",
+                    "plugin_id": self.plugin_id,
+                    "timestamp": "init_complete"
+                });
+                serde_json::to_vec(&init_response).map_err(|e| e.to_string())?
+            },
+            "cleanup" => {
+                // Cleanup plugin resources
+                let cleanup_response = json!({
+                    "status": "cleaned_up",
+                    "plugin_id": self.plugin_id
+                });
+                serde_json::to_vec(&cleanup_response).map_err(|e| e.to_string())?
             },
             "validate_input" => {
                 // Validate input data

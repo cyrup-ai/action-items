@@ -30,18 +30,32 @@ impl Plugin for EcsCachePlugin {
 
         // Add systems
         app.add_systems(
+            Startup,
+            initialize_cache_partitions_system,
+        );
+        
+        app.add_systems(
             Update,
             (
+                // Initialization polling
+                handle_partition_init_system,
+                handle_partition_init_tasks,
+                // Request processing
                 process_cache_reads_system,
                 process_cache_writes_system,
                 process_cache_invalidations_system,
+                // Task polling
+                handle_cache_read_tasks,
+                handle_cache_write_tasks,
+                handle_cache_invalidation_tasks,
+                // Maintenance
                 cache_eviction_system,
                 cache_metrics_system,
             )
                 .chain(),
         );
 
-        // Initialize default eviction monitors for each default partition
+        // Initialize default eviction monitors after partitions are created
         app.add_systems(PostStartup, setup_cache_eviction_monitors);
 
         info!("ECS Cache Plugin initialized successfully");

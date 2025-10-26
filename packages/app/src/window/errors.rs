@@ -15,17 +15,6 @@ pub enum WindowModeError {
     BevyFullscreenFailed,
 }
 
-/// Errors that can occur during viewport calculations and conversions
-#[derive(Debug, thiserror::Error)]
-pub enum ViewportError {
-    #[error("Pixel dimensions cannot be negative: width={width}, height={height}")]
-    NegativeDimensions { width: f32, height: f32 },
-    #[error("Viewport state is invalid or uninitialized")]
-    InvalidViewportState,
-    #[error("Viewport state validation failed")]
-    ValidationFailed,
-}
-
 /// Errors that can occur during screen dimension calculations
 #[derive(Debug, thiserror::Error)]
 pub enum ScreenDimensionError {

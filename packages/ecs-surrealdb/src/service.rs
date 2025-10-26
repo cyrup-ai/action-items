@@ -1,9 +1,8 @@
 //! Core database service implementation with connection management
 
-use std::time::Duration;
 use bevy::prelude::*;
 use serde::Serialize;
-use surrealdb::engine::local::{Db, SurrealKv};
+use surrealdb::engine::local::{Db, Mem, SurrealKv};
 use surrealdb::opt::Config;
 use surrealdb::opt::capabilities::Capabilities;
 use surrealdb::opt::auth::Root;
@@ -36,54 +35,38 @@ impl DatabaseService {
 }
 
 impl DatabaseService {
-    /// Create a new database service
+    /// Create a new database service - fail fast for embedded database
     pub async fn new(config: DatabaseConfig) -> Result<Self, DatabaseError> {
-        Self::new_with_retries(config, 3).await
+        config.validate()?;
+        Self::try_connect(&config).await
     }
 
-    /// Create a new database service with connection retries
-    pub async fn new_with_retries(
-        config: DatabaseConfig,
-        max_retries: u32,
-    ) -> Result<Self, DatabaseError> {
-        config.validate()?;
-
-        if max_retries == 0 {
-            return Err(DatabaseError::InvalidConfiguration(
-                "max_retries must be at least 1".into(),
-            ));
-        }
-
-        let mut last_error = DatabaseError::ConnectionFailed("No connection attempts made".into());
-        for attempt in 1..=max_retries {
-            match Self::try_connect(&config).await {
-                Ok(service) => return Ok(service),
-                Err(e) => {
-                    last_error = e;
-                    if attempt < max_retries {
-                        warn!(
-                            "Database connection attempt {} failed, retrying...",
-                            attempt
-                        );
-                        async_std::task::sleep(Duration::from_millis(1000 * attempt as u64)).await;
-                    }
-                },
-            }
-        }
-        Err(last_error)
+    /// Create a new in-memory database service for testing
+    pub async fn new_in_memory() -> Result<Self, DatabaseError> {
+        let config = DatabaseConfig {
+            namespace: "test".to_string(),
+            database: "test".to_string(),
+            engine: DatabaseEngine::Mem,
+            query_timeout_ms: 10000,
+            enable_query_logging: false,
+            credentials: crate::config::DatabaseCredentials::default(),
+            enable_all_capabilities: true,
+        };
+        Self::new(config).await
     }
 
     async fn try_connect(config: &DatabaseConfig) -> Result<Self, DatabaseError> {
         config.validate()?;
 
-        // Ensure storage directory exists for SurrealKv - create the full storage path
-        let DatabaseEngine::SurrealKv(storage_path) = &config.engine;
-        debug!("Creating storage directory: {:?}", storage_path);
-        std::fs::create_dir_all(storage_path).map_err(|e| {
-            DatabaseError::InvalidConfiguration(
-                format!("Failed to create storage directory {:?}: {}", storage_path, e)
-            )
-        })?;
+        // Ensure storage directory exists for file-based engines only
+        if let DatabaseEngine::SurrealKv(storage_path) = &config.engine {
+            debug!("Creating storage directory: {:?}", storage_path);
+            std::fs::create_dir_all(storage_path).map_err(|e| {
+                DatabaseError::InvalidConfiguration(
+                    format!("Failed to create storage directory {:?}: {}", storage_path, e)
+                )
+            })?;
+        }
 
         // Initialize SurrealDB v3.0 using proper SDK authentication pattern from tests
         let db = match &config.engine {
@@ -122,6 +105,43 @@ impl DatabaseService {
                     DatabaseError::ConnectionFailed(format!("Authentication failed: {}", e))
                 })?;
                 debug!("SurrealKV signin successful");
+                
+                db
+            },
+            DatabaseEngine::Mem => {
+                debug!("Creating in-memory database");
+                
+                // Create root credentials
+                let root = Root {
+                    username: "root",
+                    password: "root",
+                };
+                
+                // Use proper Config pattern with root user and all capabilities
+                let sdb_config = Config::new()
+                    .user(root)
+                    .capabilities(if config.enable_all_capabilities {
+                        Capabilities::all()
+                    } else {
+                        Capabilities::none()
+                    });
+                
+                debug!("Initializing in-memory database with root credentials");
+                // Initialize in-memory database using Mem engine
+                let result = Surreal::new::<Mem>(sdb_config).await;
+                debug!("In-memory database initialization result: {:?}", result.is_ok());
+                let db = result.map_err(|e| {
+                    warn!("In-memory database initialization failed: {}", e);
+                    DatabaseError::ConnectionFailed(e.to_string())
+                })?;
+                
+                // Sign in using root credentials
+                debug!("Signing in with root credentials");
+                db.signin(root).await.map_err(|e| {
+                    warn!("In-memory database signin failed: {}", e);
+                    DatabaseError::ConnectionFailed(format!("Authentication failed: {}", e))
+                })?;
+                debug!("In-memory database signin successful");
                 
                 db
             },

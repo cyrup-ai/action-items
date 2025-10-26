@@ -48,7 +48,11 @@ pub trait NativePlugin: Send + Sync {
         &mut self,
         context: PluginContext,
         task_pool: &AsyncComputeTaskPool,
-    ) -> Task<Result<(), Error>>;
+    ) -> Task<Result<(), Error>> {
+        task_pool.spawn(async move {
+            Ok(())
+        })
+    }
 
     /// Clean up resources
     fn cleanup(
@@ -57,11 +61,4 @@ pub trait NativePlugin: Send + Sync {
     ) -> Task<Result<(), Error>>;
 }
 
-// Note: Default implementations for methods returning Task might be tricky
-// unless they spawn a trivial completed task. It's often better to require
-// implementors to provide the full task spawning logic.
-// e.g., for background_refresh if not supported:
-// fn background_refresh(&mut self, _context: PluginContext, task_pool: &AsyncComputeTaskPool) ->
-// Task<Result<(), Error>> { task_pool.spawn(async { Ok(()) })
-// }
-// However, for now, let's omit default implementations to ensure each plugin explicitly handles it.
+

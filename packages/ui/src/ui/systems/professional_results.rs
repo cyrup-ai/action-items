@@ -12,7 +12,8 @@ use crate::ui::components::{
     ActionItemsSearchResultItem, ActionItemsSearchResultShortcut, ActionItemsSearchResultSubtitle,
     ActionItemsSearchResultTitle, ResultsContainer, UiFonts,
 };
-use crate::ui::icons::{LauncherIconCache, get_icon_for_search_result};
+use crate::ui::icons::{GenericIconFallbacks, get_icon_for_search_result};
+use action_items_ecs_ui::icons::IconCache;
 use action_items_ecs_ui::gradients::GradientComponent;
 use action_items_ecs_ui::theme::{ShadowElevation, Theme};
 use crate::ui::typography::TypographyScale;
@@ -29,7 +30,8 @@ pub fn render_professional_results(
     theme: Res<Theme>,
     typography: Res<TypographyScale>,
     ui_fonts: Res<UiFonts>,
-    icon_cache: Res<LauncherIconCache>,
+    icon_cache: Res<IconCache>,
+    fallbacks: Res<GenericIconFallbacks>,
 ) {
     if !search_results.is_changed() {
         return;
@@ -107,7 +109,7 @@ pub fn render_professional_results(
                             // Get proper icon from cache using the SearchResult
                             let search_result = &search_results.results[index];
                             let icon_handle =
-                                get_icon_for_search_result(search_result, &icon_cache);
+                                get_icon_for_search_result(search_result, &icon_cache, &fallbacks);
 
                             // Create ImageNode with proper icon
                             icon_parent.spawn((

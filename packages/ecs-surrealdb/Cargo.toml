@@ -12,11 +12,10 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 futures = { workspace = true }
-async-std = "1.13.0"
 uuid = { workspace = true }
 
 # SurrealDB dependencies - MUST use project fork SDK crate
-surrealdb = { path = "../../forks/surrealdb/crates/sdk", features = ["kv-surrealkv"] }
+surrealdb = { path = "../../forks/surrealdb/crates/sdk", features = ["kv-surrealkv", "kv-mem"] }
 
 # Common types and traits
 action_items_common = { path = "../common" }

@@ -148,7 +148,7 @@ mod integration_tests {
             .expect("Failed to create in-memory database");
         
         // Initialize schema
-        db.execute_schema(USER_SETTINGS_SCHEMA)
+        db.query(USER_SETTINGS_SCHEMA)
             .await
             .expect("Failed to initialize schema");
         
@@ -176,7 +176,7 @@ mod integration_tests {
             operation_id,
             table: "user_preferences".to_string(),
             key: "test_user".to_string(),
-            value: Value::from(test_value.clone()),
+            value: serde_json::from_value(test_value.clone()).expect("Failed to convert json to Value"),
             requester,
         });
 
@@ -199,8 +199,7 @@ mod integration_tests {
 
         // Check for completion event
         let mut completed_events = app.world_mut()
-            .resource_mut::<Events<SettingsReadCompleted>>()
-            .expect("SettingsReadCompleted events should exist");
+            .resource_mut::<Events<SettingsReadCompleted>>();
         
         let events: Vec<_> = completed_events.drain().collect();
         assert_eq!(events.len(), 1, "Should have one read completion event");
@@ -211,7 +210,8 @@ mod integration_tests {
         
         if let Ok(Some(value)) = &event.result {
             // Verify the value matches what we wrote
-            assert_eq!(value, &Value::from(test_value));
+            let expected_value: Value = serde_json::from_value(test_value).expect("Failed to convert");
+            assert_eq!(value, &expected_value);
         } else {
             panic!("Expected Some(value) from read");
         }
@@ -233,7 +233,7 @@ mod integration_tests {
             operation_id,
             table: "user_preferences".to_string(),
             key: "write_test".to_string(),
-            value: Value::from(test_value.clone()),
+            value: serde_json::from_value(test_value.clone()).expect("Failed to convert json to Value"),
             requester,
         });
 
@@ -243,8 +243,7 @@ mod integration_tests {
 
         // Check completion event
         let mut completed_events = app.world_mut()
-            .resource_mut::<Events<SettingsWriteCompleted>>()
-            .expect("SettingsWriteCompleted events should exist");
+            .resource_mut::<Events<SettingsWriteCompleted>>();
         
         let events: Vec<_> = completed_events.drain().collect();
         assert_eq!(events.len(), 1);
@@ -252,8 +251,7 @@ mod integration_tests {
 
         // Verify SettingChanged event was emitted
         let mut change_events = app.world_mut()
-            .resource_mut::<Events<SettingChanged>>()
-            .expect("SettingChanged events should exist");
+            .resource_mut::<Events<SettingChanged>>();
         
         let changes: Vec<_> = change_events.drain().collect();
         assert_eq!(changes.len(), 1, "Should emit one SettingChanged event");
@@ -277,7 +275,7 @@ mod integration_tests {
             operation_id: write_id,
             table: "user_preferences".to_string(),
             key: "update_test".to_string(),
-            value: Value::from(initial_value),
+            value: serde_json::from_value(initial_value).expect("Failed to convert json to Value"),
             requester,
         });
 
@@ -287,8 +285,8 @@ mod integration_tests {
         // Now update with partial fields
         let update_id = Uuid::new_v4();
         let mut update_fields = HashMap::new();
-        update_fields.insert("theme".to_string(), Value::from("dark"));
-        update_fields.insert("font_size".to_string(), Value::from(16));
+        update_fields.insert("theme".to_string(), serde_json::from_value(serde_json::json!("dark")).expect("Failed to convert"));
+        update_fields.insert("font_size".to_string(), serde_json::from_value(serde_json::json!(16)).expect("Failed to convert"));
         
         app.world_mut().send_event(SettingsUpdateRequested {
             operation_id: update_id,
@@ -303,8 +301,7 @@ mod integration_tests {
 
         // Check completion
         let mut completed_events = app.world_mut()
-            .resource_mut::<Events<SettingsUpdateCompleted>>()
-            .expect("SettingsUpdateCompleted events should exist");
+            .resource_mut::<Events<SettingsUpdateCompleted>>();
         
         let events: Vec<_> = completed_events.drain().collect();
         assert_eq!(events.len(), 1);
@@ -312,12 +309,11 @@ mod integration_tests {
 
         // Verify SettingChanged event has old_value populated (task 2.2)
         let mut change_events = app.world_mut()
-            .resource_mut::<Events<SettingChanged>>()
-            .expect("SettingChanged events should exist");
+            .resource_mut::<Events<SettingChanged>>();
         
         let changes: Vec<_> = change_events.drain().collect();
         // Should have 2 events: write + update
-        assert!(changes.len() >= 1, "Should have SettingChanged events");
+        assert!(!changes.is_empty(), "Should have SettingChanged events");
         
         let update_change = changes.last().expect("Should have update change");
         assert!(
@@ -339,7 +335,7 @@ mod integration_tests {
             operation_id: write_id,
             table: "user_preferences".to_string(),
             key: "delete_test".to_string(),
-            value: Value::from(test_value),
+            value: serde_json::from_value(test_value).expect("Failed to convert json to Value"),
             requester,
         });
 
@@ -360,8 +356,7 @@ mod integration_tests {
 
         // Check completion
         let mut completed_events = app.world_mut()
-            .resource_mut::<Events<SettingsDeleteCompleted>>()
-            .expect("SettingsDeleteCompleted events should exist");
+            .resource_mut::<Events<SettingsDeleteCompleted>>();
         
         let events: Vec<_> = completed_events.drain().collect();
         assert_eq!(events.len(), 1);
@@ -372,8 +367,7 @@ mod integration_tests {
 
         // Verify SettingChanged event with old_value and Value::default() (task 2.3)
         let mut change_events = app.world_mut()
-            .resource_mut::<Events<SettingChanged>>()
-            .expect("SettingChanged events should exist");
+            .resource_mut::<Events<SettingChanged>>();
         
         let changes: Vec<_> = change_events.drain().collect();
         let delete_change = changes.last().expect("Should have delete change");
@@ -402,7 +396,7 @@ mod integration_tests {
             operation_id,
             table: "user_preferences".to_string(),
             key: "audit_write".to_string(),
-            value: Value::from(test_value),
+            value: serde_json::from_value(test_value).expect("Failed to convert json to Value"),
             requester,
         });
 
@@ -424,8 +418,7 @@ mod integration_tests {
 
         // Check audit entries exist
         let mut query_events = app.world_mut()
-            .resource_mut::<Events<SettingsQueryCompleted>>()
-            .expect("SettingsQueryCompleted events should exist");
+            .resource_mut::<Events<SettingsQueryCompleted>>();
         
         let events: Vec<_> = query_events.drain().collect();
         assert_eq!(events.len(), 1);
@@ -459,8 +452,7 @@ mod integration_tests {
 
         // Should get error event
         let mut completed_events = app.world_mut()
-            .resource_mut::<Events<SettingsReadCompleted>>()
-            .expect("SettingsReadCompleted events should exist");
+            .resource_mut::<Events<SettingsReadCompleted>>();
         
         let events: Vec<_> = completed_events.drain().collect();
         assert_eq!(events.len(), 1);
@@ -471,7 +463,6 @@ mod integration_tests {
 // Migration tests are disabled pending DatabaseService test API
 #[cfg(all(test, feature = "integration-tests"))]
 mod migration_tests {
-    use std::path::PathBuf;
     use tempfile::TempDir;
     use std::fs;
     use serde_json::json;

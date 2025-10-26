@@ -25,6 +25,8 @@ pub enum DatabaseError {
 pub enum DatabaseEngine {
     /// SurrealKV persistent storage with path
     SurrealKv(std::path::PathBuf),
+    /// In-memory database (for testing)
+    Mem,
 }
 
 /// Database root credentials
@@ -113,9 +115,10 @@ impl DatabaseConfig {
             ));
         }
 
-        // Validate storage path security
-        let DatabaseEngine::SurrealKv(path) = &self.engine;
-        Self::validate_storage_path(path)?;
+        // Validate storage path security (only for file-based engines)
+        if let DatabaseEngine::SurrealKv(path) = &self.engine {
+            Self::validate_storage_path(path)?;
+        }
 
         Ok(())
     }

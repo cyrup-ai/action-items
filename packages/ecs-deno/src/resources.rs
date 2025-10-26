@@ -1301,39 +1301,29 @@ impl ResourceMetrics {
             ) -> i32;
         }
 
-        const TASK_VM_INFO: u32 = 22;
-        const TASK_VM_INFO_COUNT: u32 = 18;
+        // Use MACH_TASK_BASIC_INFO which is more reliable across macOS versions
+        const MACH_TASK_BASIC_INFO: u32 = 20;
+        const MACH_TASK_BASIC_INFO_COUNT: u32 = 12;
 
         #[repr(C)]
-        struct TaskVmInfo {
+        struct MachTaskBasicInfo {
             virtual_size: u64,
-            region_count: u32,
-            page_size: u32,
             resident_size: u64,
-            resident_size_peak: u64,
-            device: u64,
-            device_peak: u64,
-            internal: u64,
-            internal_peak: u64,
-            external: u64,
-            external_peak: u64,
-            reusable: u64,
-            reusable_peak: u64,
-            purgeable_volatile_pmap: u64,
-            purgeable_volatile_resident: u64,
-            purgeable_volatile_virtual: u64,
-            compressed: u64,
-            compressed_peak: u64,
+            resident_size_max: u64,
+            user_time: [i32; 2],      // time_value_t { integer_t seconds, microseconds }
+            system_time: [i32; 2],    // time_value_t { integer_t seconds, microseconds }
+            policy: i32,
+            suspend_count: i32,
         }
 
-        let mut info: TaskVmInfo = unsafe { std::mem::zeroed() };
-        let mut count = TASK_VM_INFO_COUNT;
+        let mut info: MachTaskBasicInfo = unsafe { std::mem::zeroed() };
+        let mut count = MACH_TASK_BASIC_INFO_COUNT;
         
         let result = unsafe {
             task_info(
                 mach_task_self(),
-                TASK_VM_INFO,
-                &mut info as *mut TaskVmInfo as *mut u8,
+                MACH_TASK_BASIC_INFO,
+                &mut info as *mut MachTaskBasicInfo as *mut u8,
                 &mut count,
             )
         };

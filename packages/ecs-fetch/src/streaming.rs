@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+use std::hash::{Hash, Hasher};
 
 use bevy::prelude::*;
 use bytes::{Bytes, BytesMut};
@@ -500,13 +501,24 @@ impl StreamHandler {
             *sequence, operation_id, correlation_id, original_size
         );
 
-        // Apply chunk compression if enabled (simplified for now)
+        // Process chunk: calculate hash for integrity and validate size
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        chunk.hash(&mut hasher);
+        let hash_value = hasher.finish();
+
+        // Validate chunk size
+        const MAX_CHUNK_SIZE: usize = 10 * 1024 * 1024; // 10MB
+        if original_size > MAX_CHUNK_SIZE {
+            return Err(StreamingError::ChunkProcessingError("Chunk size exceeds maximum limit".to_string()));
+        }
+
+        // Decompression would be applied here if per-chunk, but handled upstream for streaming
         let processed_chunk = chunk;
 
         let metadata = ChunkMetadata {
             original_size,
             compressed_size: None,
-            hash: None, // Could add hash calculation here
+            hash: Some(hash_value),
             encoding: None,
         };
 

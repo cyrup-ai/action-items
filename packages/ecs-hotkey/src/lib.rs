@@ -46,6 +46,7 @@ pub mod system_hotkeys;
 use std::time::Duration;
 
 use bevy::prelude::*;
+use ecs_preferences::HotkeyCaptureUIState;
 pub use capture::*;
 pub use components::*;
 pub use conflict::*;
@@ -222,6 +223,7 @@ impl Plugin for HotkeyPlugin {
         .insert_resource(MultiCaptureState::default())
         .insert_resource(HotkeyMetrics::default())
         .insert_resource(HotkeyPreferences::default())
+        .insert_resource(HotkeyProfiles::default())
         .insert_resource(HotkeyAnalytics::default())
         .insert_resource(HotkeyEntityMap::default())
         .insert_resource(HotkeyConfig {
@@ -297,7 +299,7 @@ impl Plugin for HotkeyPlugin {
             (
                 // Real-time capture
                 (process_hotkey_capture_requests_system,).in_set(HotkeySystemSet::Capture),
-                (real_hotkey_capture_system,).in_set(HotkeySystemSet::Capture),
+                // Note: real_hotkey_capture_system removed - app provides its own implementation
                 // Multi-session capture
                 (process_multi_capture_requests_system,).in_set(HotkeySystemSet::Capture),
                 (multi_session_capture_system,).in_set(HotkeySystemSet::Capture),

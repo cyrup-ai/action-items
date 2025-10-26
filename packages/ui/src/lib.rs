@@ -5,10 +5,9 @@ pub mod ui;
 // Re-export the public interface
 use bevy::prelude::*;
 use action_items_ecs_ui::accessibility::AccessibilityPlugin;
+use action_items_ecs_ui::icons::IconPlugin;
 use action_items_ecs_ui::performance::PerformancePlugin;
 use ui::accessibility::{setup_accessibility, update_accessibility_announcements};
-use ui::icons::extraction::poll_icon_extraction_tasks;
-use ui::icons::process_icon_extraction_requests;
 pub use ui::systems::MonitorConstraintsPlugin;
 // PHASE 3: Re-export SearchQueryChanged for main app access
 pub use ui::systems::SearchQueryChanged;
@@ -35,20 +34,21 @@ use ui::systems::{
 // Re-export theme, typography, gradients, responsive layout, and visibility system for main app
 pub use action_items_ecs_ui::gradients::GradientPlugin;
 pub use action_items_ecs_ui::responsive::ResponsivePlugin;
-pub use action_items_ecs_ui::theme::{ShadowElevation, SpacingScale, Theme};
+use action_items_ecs_ui::theme::Theme;
+pub use action_items_ecs_ui::theme::{ShadowElevation, SpacingScale};
 pub use action_items_ecs_ui::visibility::{
     UiAnimationCompleteEvent, UiComponentTarget, UiVisibilityAnimation,
     UiVisibilityAnimationType, UiVisibilityEvent, VisibilityPlugin,
 };
 pub use ui::typography::{TextBundleBuilder, TypographyScale};
 pub use ui::{
-    LauncherIconCache,  // App-specific wrapper (keep)
+    GenericIconFallbacks,  // App-specific icon fallbacks
     PrivacyConfiguration, PrivacyIndicatorPlugin, PrivacyIndicators,
     UiState, set_ui_visibility, systems,
 };
 // Re-export ecs-ui icon types (expanded set)
 pub use action_items_ecs_ui::icons::{
-    IconSize, IconType, IconTheme, ThemeColors, FontAwesome,
+    IconCache, IconSize, IconType, IconTheme, ThemeColors, FontAwesome,
     IconExtractionRequest, IconExtractionResult,
 };
 
@@ -57,23 +57,21 @@ pub struct LauncherUiPlugin;
 impl Plugin for LauncherUiPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<UiState>()
-            .init_resource::<LauncherIconCache>()
-            .init_resource::<IconTheme>()
-            .init_resource::<FontAwesome>()
+            .init_resource::<GenericIconFallbacks>()
+            .init_resource::<Theme>()  // Initialize ecs-ui Theme for SearchUIPlugin
+            // Add ecs-ui IconPlugin (handles all icon systems)
+            .add_plugins(IconPlugin)
             // Add performance monitoring plugin from ecs-ui
             .add_plugins(PerformancePlugin)
             // Add gradient system plugin from ecs-ui
             .add_plugins(GradientPlugin)
-            // Add responsive layout plugin from ecs-ui
-            .add_plugins(ResponsivePlugin)
+            // Note: ResponsivePlugin is added by UiLunexPlugins group, not here
             // Add visibility animation plugin from ecs-ui
             .add_plugins(VisibilityPlugin)
             // Add accessibility plugin from ecs-ui
             .add_plugins(AccessibilityPlugin)
             // Add privacy indicators plugin
             .add_plugins(ui::ai_menu::PrivacyIndicatorPlugin)
-            .add_event::<IconExtractionRequest>()
-            .add_event::<IconExtractionResult>()
             .add_event::<SearchQueryChanged>()
             .add_systems(Startup, setup_ui.before(initialize_icon_system))
             .add_systems(PostStartup, load_fallback_icon_system)
@@ -96,11 +94,6 @@ impl Plugin for LauncherUiPlugin {
             .add_systems(Update, handle_visibility_animation_complete)
             // Application-specific responsive container adaptation
             .add_systems(Update, adaptive_container_system)
-            // Icon extraction systems
-            .add_systems(
-                Update,
-                (process_icon_extraction_requests, poll_icon_extraction_tasks),
-            )
             // Icon and animation systems
             .add_systems(Update, update_result_icons_system)
             .add_systems(Update, animate_result_items_system)

@@ -47,5 +47,6 @@ pub mod ecs_queries;
 pub mod extism;
 pub mod interface;
 pub mod native;
+pub mod security;
 pub mod service_bridge_integration;
 pub mod services;

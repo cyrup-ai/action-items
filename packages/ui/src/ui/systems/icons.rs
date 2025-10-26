@@ -5,8 +5,8 @@
 use bevy::prelude::*;
 
 use crate::ui::components::{FallbackIcon, ImageComponent, ResultIcon};
-use crate::ui::icons::LauncherIconCache;
-use action_items_ecs_ui::icons::IconTheme;
+use crate::ui::icons::GenericIconFallbacks;
+use action_items_ecs_ui::icons::{IconCache, IconTheme};
 
 /// Initialize icon extraction and cache systems
 /// Zero-allocation icon system initialization with blazing-fast cache setup
@@ -14,12 +14,13 @@ use action_items_ecs_ui::icons::IconTheme;
 pub fn initialize_icon_system_system(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    icon_cache: Option<Res<LauncherIconCache>>,
+    fallbacks: Option<Res<GenericIconFallbacks>>,
     icon_theme: Option<Res<IconTheme>>,
 ) {
     // Initialize icon-related resources if not already done
-    if icon_cache.is_none() {
-        commands.insert_resource(LauncherIconCache::new());
+    // Note: IconCache is initialized by IconPlugin
+    if fallbacks.is_none() {
+        commands.insert_resource(GenericIconFallbacks::new());
     }
 
     if icon_theme.is_none() {
@@ -35,14 +36,14 @@ pub fn initialize_icon_system_system(
 /// Zero-allocation icon updates with blazing-fast asset loading and fallback handling
 #[inline]
 pub fn update_result_icons_system(
-    icon_cache: Res<LauncherIconCache>,
+    icon_cache: Res<IconCache>,
     fallback_icon: Res<FallbackIcon>,
     _asset_server: Res<AssetServer>,
     mut icon_query: Query<(&mut ImageComponent, &ResultIcon)>,
 ) {
     for (mut image_component, result_icon) in icon_query.iter_mut() {
         // Try to get cached icon first
-        if let Some(cached_icon) = icon_cache.loaded_icons().get(&result_icon.result_id) {
+        if let Some(cached_icon) = icon_cache.loaded_icons.get(&result_icon.result_id) {
             image_component.0 = cached_icon.clone();
         } else if let Some(fallback) = &fallback_icon.0 {
             // Use fallback icon while loading

@@ -3,15 +3,16 @@ use action_items_core::SearchResult;
 use bevy::prelude::*;
 
 // Import types from appropriate locations
-use crate::ui::icons::types::LauncherIconCache;  // App-specific wrapper
-use action_items_ecs_ui::icons::IconType;  // Generic type from ecs-ui
+use crate::ui::icons::types::GenericIconFallbacks;  // App-specific fallbacks
+use action_items_ecs_ui::icons::{IconCache, IconType};  // ecs-ui types
 
 pub fn get_icon_for_result(
     result: &action_items_core::plugins::ActionItem,
-    icon_cache: &LauncherIconCache,
+    icon_cache: &IconCache,
+    fallbacks: &GenericIconFallbacks,
 ) -> Handle<Image> {
     // Check if we have a loaded icon for this result
-    if let Some(handle) = icon_cache.loaded_icons().get(&result.action) {
+    if let Some(handle) = icon_cache.loaded_icons.get(&result.action) {
         return handle.clone();
     }
 
@@ -27,17 +28,21 @@ pub fn get_icon_for_result(
     };
 
     // Return generic icon as fallback
-    icon_cache
-        .generic_icons
+    fallbacks
+        .fallback_icons
         .get(&icon_type)
-        .or_else(|| icon_cache.generic_icons.get(&IconType::Unknown))
+        .or_else(|| fallbacks.fallback_icons.get(&IconType::Unknown))
         .cloned()
         .unwrap_or_default()
 }
 
-pub fn get_icon_for_search_result(result: &SearchResult, icon_cache: &LauncherIconCache) -> Handle<Image> {
+pub fn get_icon_for_search_result(
+    result: &SearchResult,
+    icon_cache: &IconCache,
+    fallbacks: &GenericIconFallbacks,
+) -> Handle<Image> {
     // Check if we have a loaded icon for this result
-    if let Some(handle) = icon_cache.loaded_icons().get(&result.action) {
+    if let Some(handle) = icon_cache.loaded_icons.get(&result.action) {
         return handle.clone();
     }
 
@@ -53,10 +58,10 @@ pub fn get_icon_for_search_result(result: &SearchResult, icon_cache: &LauncherIc
     };
 
     // Return generic icon as fallback
-    icon_cache
-        .generic_icons
+    fallbacks
+        .fallback_icons
         .get(&icon_type)
-        .or_else(|| icon_cache.generic_icons.get(&IconType::Unknown))
+        .or_else(|| fallbacks.fallback_icons.get(&IconType::Unknown))
         .cloned()
         .unwrap_or_default()
 }

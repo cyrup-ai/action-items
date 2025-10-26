@@ -7,13 +7,11 @@ use action_items_core::{LauncherEvent, LauncherEventType};
 use action_items_ui::{UiState, set_ui_visibility};
 use bevy::prelude::*;
 use bevy::window::{Monitor, MonitorSelection, PrimaryWindow, Window};
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::overlay_window::configure_overlay_window_cross_platform;
 use crate::window::positioning::{calculate_responsive_window_size, get_active_screen_dimensions};
-use crate::window::state::{
-    ViewportState, WindowModeManager, convert_window_to_viewport_units, screen_to_viewport,
-};
+use crate::window::state::WindowModeManager;
 use crate::window::{ActiveMonitor, LauncherState, WindowAnimation};
 
 /// Initial setup system for window management
@@ -224,37 +222,6 @@ pub fn adjust_window_size_for_results_system(
 #[inline]
 pub fn lerp(start: f32, end: f32, t: f32) -> f32 {
     start + (end - start) * t.clamp(0.0, 1.0)
-}
-
-/// System to validate and debug viewport calculations
-/// Uses all ViewportState methods for comprehensive testing in debug builds
-#[cfg(debug_assertions)]
-pub fn debug_viewport_calculations_system(
-    primary_window: Query<&Window, With<PrimaryWindow>>,
-    viewport_state: Option<Res<ViewportState>>,
-) {
-    if let (Ok(window), Some(viewport)) = (primary_window.single(), viewport_state) {
-        let window_width = window.resolution.width();
-        let window_height = window.resolution.height();
-
-        // Test convert_window_to_viewport_units (uses pixels_to_vw, pixels_to_vh, is_valid)
-        if let Ok((vw_percent, vh_percent)) =
-            convert_window_to_viewport_units(window_width, window_height, &viewport)
-        {
-            // Test screen_to_viewport function
-            if let Ok((val_vw, val_vh)) = screen_to_viewport(
-                window_width * 0.5,  // Half window width
-                window_height * 0.5, // Half window height
-                &viewport,
-            ) {
-                // Log viewport calculations for debugging (only in debug builds)
-                debug!(
-                    "Viewport debug: Window {}x{} -> {}vw x {}vh, Half-window -> {:?} x {:?}",
-                    window_width, window_height, vw_percent, vh_percent, val_vw, val_vh
-                );
-            }
-        }
-    }
 }
 
 /// Window mode management system that uses all WindowModeManager fields

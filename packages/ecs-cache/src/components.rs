@@ -1,5 +1,6 @@
 use std::time::Instant;
 
+use bevy::ecs::world::CommandQueue;
 use bevy::prelude::*;
 use bevy::tasks::Task;
 use goldylox::prelude::CacheOperationError;
@@ -147,3 +148,41 @@ impl CacheAccessPattern {
         self.access_frequency > 1.0 / 60.0
     }
 }
+
+// ============================================================================
+// Async Task Components
+// ============================================================================
+
+/// Component for cache read task
+#[derive(Component)]
+pub struct CacheReadTask {
+    pub operation_id: CacheOperationId,
+    pub partition: CachePartition,
+    pub key: CacheKey,
+    pub requester: String,
+    pub task: Task<CommandQueue>,
+}
+
+/// Component for cache write task
+#[derive(Component)]
+pub struct CacheWriteTask {
+    pub operation_id: CacheOperationId,
+    pub partition: CachePartition,
+    pub key: CacheKey,
+    pub requester: String,
+    pub task: Task<CommandQueue>,
+}
+
+/// Component for cache invalidation task
+#[derive(Component)]
+pub struct CacheInvalidateTask {
+    pub operation_id: CacheOperationId,
+    pub partition: CachePartition,
+    pub key: CacheKey,
+    pub requester: String,
+    pub task: Task<CommandQueue>,
+}
+
+/// Component for partition initialization task
+#[derive(Component)]
+pub struct PartitionInitTask(pub Task<CommandQueue>);

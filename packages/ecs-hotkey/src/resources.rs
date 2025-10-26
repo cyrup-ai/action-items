@@ -254,28 +254,7 @@ pub struct HotkeyCaptureState {
     pub current_requester: Option<String>,
 }
 
-/// Hotkey capture UI state (move to ecs-preferences or ecs-ui package)
-/// 
-/// UI-specific state for preferences window rendering.
-/// TODO: In future refactor, move HotkeyCaptureUIState to:
-/// packages/ecs-preferences/src/resources.rs OR packages/ecs-ui/src/preferences/resources.rs
-#[derive(Resource, Default)]
-pub struct HotkeyCaptureUIState {
-    /// Whether preferences window is visible
-    pub visible: bool,
-    
-    /// Is the hotkey input field focused?
-    pub input_focused: bool,
-    
-    /// Current hotkey status for UI display
-    pub current_status: HotkeyStatus,
-    
-    /// Whether currently testing a hotkey
-    pub testing_hotkey: bool,
-    
-    /// Available alternative hotkey combinations
-    pub available_alternatives: Vec<HotkeyDefinition>,
-}
+
 
 /// Unique identifier for hotkey operations
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -633,17 +612,7 @@ pub fn merge_bindings(
     }
 }
 
-/// Scan for available hotkey combinations using user preferences
-/// Zero allocation preference scanning with intelligent conflict detection
-#[inline]
-pub fn scan_for_available_hotkeys(
-    capture_ui_state: &mut HotkeyCaptureUIState,
-    hotkey_prefs: &HotkeyPreferences,
-) {
-    // Use preferred_combinations from HotkeyPreferences instead of hardcoded list
-    // This ensures user preferences are respected for conflict scanning
-    capture_ui_state.available_alternatives = hotkey_prefs.preferred_combinations.clone();
-}
+
 
 
 // ============================================================================

@@ -27,6 +27,8 @@ pub enum Error {
     Serialization(SerializationError),
     /// Runtime errors
     Runtime(RuntimeError),
+    /// Security verification errors
+    SecurityVerification(SecurityError),
 
     // Additional error variants needed by the codebase
     /// Configuration-related errors (direct variant for backward compatibility)
@@ -165,6 +167,43 @@ pub enum RuntimeError {
     ResourceAllocationFailed(String),
 }
 
+/// Security verification errors
+#[derive(Debug, Clone)]
+pub enum SecurityError {
+    /// Signature verification failed
+    SignatureVerificationFailed(String),
+    /// OS permission check failed
+    OsPermissionCheckFailed(String),
+    /// Capability not granted
+    CapabilityNotGranted(String),
+    /// Audit logging failed
+    AuditFailure(String),
+    /// Verifier initialization failed
+    InitializationFailed(String),
+}
+
+impl fmt::Display for SecurityError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SecurityError::SignatureVerificationFailed(msg) => {
+                write!(f, "Signature verification failed: {}", msg)
+            },
+            SecurityError::OsPermissionCheckFailed(msg) => {
+                write!(f, "OS permission check failed: {}", msg)
+            },
+            SecurityError::CapabilityNotGranted(msg) => {
+                write!(f, "Capability not granted: {}", msg)
+            },
+            SecurityError::AuditFailure(msg) => {
+                write!(f, "Audit logging failed: {}", msg)
+            },
+            SecurityError::InitializationFailed(msg) => {
+                write!(f, "Verifier initialization failed: {}", msg)
+            },
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -177,6 +216,9 @@ impl fmt::Display for Error {
             Error::Io(e) => write!(f, "I/O error: {}", e),
             Error::Serialization(e) => write!(f, "Serialization error: {}", e),
             Error::Runtime(e) => write!(f, "Runtime error: {}", e),
+            Error::SecurityVerification(e) => {
+                write!(f, "Security verification error: {}", e)
+            },
 
             // Additional error variants needed by the codebase
             Error::ConfigurationError(msg) => write!(f, "Configuration error: {}", msg),
@@ -320,6 +362,7 @@ impl StdError for ServiceBridgeError {}
 impl StdError for FileSystemError {}
 impl StdError for SerializationError {}
 impl StdError for RuntimeError {}
+impl StdError for SecurityError {}
 
 // Conversion from standard I/O errors
 impl From<std::io::Error> for Error {

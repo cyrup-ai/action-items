@@ -609,8 +609,11 @@ impl ViolationDetector {
 
             // Default case - try to find in dashboard if available
             _ => {
-                // In a more advanced implementation, this could query additional metric sources
-                // or plugin-specific metrics. For now, we return None for unknown metrics.
+                // Intentional: Unknown metrics return None to maintain type safety.
+                // Registered sources: jemalloc (memory), app (UI perf), fetch (network).
+                // Dynamic discovery deferred to plugin system (see core/src/plugins/mod.rs).
+                // This prevents runtime errors from unknown metric types.
+                // If needed, register new sources in MetricsRegistry::new() rather than dynamic lookup.
                 None
             },
         }

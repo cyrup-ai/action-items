@@ -471,32 +471,55 @@ pub struct AccessibilityState {
 }
 
 /// System to detect and respond to accessibility preferences with real platform APIs
+/// Uses timer-based polling to avoid excessive OS API calls (polls every 3 seconds instead of every frame)
 pub fn detect_accessibility_preferences(
     mut accessibility_manager: ResMut<AccessibilityManager>,
     detector: Option<Res<AccessibilityDetector>>,
+    mut poll_timer: Local<Option<Timer>>,
+    time: Res<Time>,
 ) {
+    // Initialize timer for periodic polling (every 3 seconds)
+    if poll_timer.is_none() {
+        *poll_timer = Some(Timer::from_seconds(3.0, TimerMode::Repeating));
+    }
+    
+    // Only poll when timer fires, not every frame
+    if let Some(ref mut timer) = poll_timer.as_mut() {
+        timer.tick(time.delta());
+        if !timer.just_finished() {
+            return; // Skip this frame
+        }
+    }
+    
     if let Some(detector) = detector {
         #[allow(clippy::disallowed_methods)]
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             detector.get_accessibility_state()
         })) {
             Ok(state) => {
+                // Check if accessibility state has actually changed
+                let state_changed = accessibility_manager.screen_reader_active != state.screen_reader_active
+                    || accessibility_manager.high_contrast != state.high_contrast
+                    || accessibility_manager.reduced_motion != state.reduced_motion;
+
                 // Update accessibility manager with real system state
                 accessibility_manager.screen_reader_active = state.screen_reader_active;
                 accessibility_manager.high_contrast = state.high_contrast;
                 accessibility_manager.reduced_motion = state.reduced_motion;
 
-                // Log accessibility state changes for debugging
-                tracing::debug!(
-                    "Accessibility state updated: screen_reader={}, high_contrast={}, \
-                     reduced_motion={}, large_text={}",
-                    state.screen_reader_active,
-                    state.high_contrast,
-                    state.reduced_motion,
-                    state.large_text
-                );
+                // Only log when state actually changes
+                if state_changed {
+                    tracing::info!(
+                        "Accessibility state changed: screen_reader={}, high_contrast={}, \
+                         reduced_motion={}, large_text={}",
+                        state.screen_reader_active,
+                        state.high_contrast,
+                        state.reduced_motion,
+                        state.large_text
+                    );
+                }
 
-                // Export accessibility metrics
+                // Always update metrics (lightweight operation)
                 metrics::gauge!("accessibility_screen_reader_active")
                     .set(if state.screen_reader_active { 1.0 } else { 0.0 });
                 metrics::gauge!("accessibility_high_contrast").set(if state.high_contrast {
@@ -516,7 +539,7 @@ pub fn detect_accessibility_preferences(
                 });
 
                 // Add announcements for screen reader users if state changed
-                if state.screen_reader_active && accessibility_manager.announcements.is_empty() {
+                if state_changed && state.screen_reader_active && accessibility_manager.announcements.is_empty() {
                     accessibility_manager.announcements.push(
                         "Action Items application loaded with accessibility support enabled"
                             .to_string(),
@@ -532,6 +555,7 @@ pub fn detect_accessibility_preferences(
             },
         }
     } else {
+        // Only log warning when timer fires, not every frame
         tracing::warn!(
             "AccessibilityDetector resource not found - using default accessibility settings"
         );

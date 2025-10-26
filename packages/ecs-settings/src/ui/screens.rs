@@ -127,7 +127,7 @@ fn spawn_sidebar(commands: &mut Commands, parent: Entity) -> (Entity, HashMap<Se
     commands.entity(sidebar).insert(ChildOf(parent));
 
     let mut tab_buttons = HashMap::new();
-    
+
     for (idx, tab) in SettingsTab::all().iter().enumerate() {
         let button = commands.spawn((
             UiLayout::window()
@@ -140,12 +140,23 @@ fn spawn_sidebar(commands: &mut Commands, parent: Entity) -> (Entity, HashMap<Se
             SettingsTabButton { tab: *tab },
             Pickable::default(),
             Interaction::None,
-            Text::new(tab.display_name()),
-            UiTextSize::from(Em(1.0)),
-            UiColor::from(TEXT_PRIMARY),
             Name::new(format!("TabButton_{:?}", tab)),
         )).id();
-        
+
+        // Text as child entity with its own UiColor (prevents duplicate UiColor on button)
+        commands.entity(button).with_children(|parent| {
+            parent.spawn((
+                UiLayout::window()
+                    .size((Rl(100.0), Rl(100.0)))
+                    .anchor(Anchor::Center)
+                    .pack(),
+                Text::new(tab.display_name()),
+                UiTextSize::from(Em(1.0)),
+                UiColor::from(TEXT_PRIMARY),
+                Name::new(format!("TabButtonText_{:?}", tab)),
+            ));
+        });
+
         commands.entity(button).insert(ChildOf(sidebar));
         tab_buttons.insert(*tab, button);
     }

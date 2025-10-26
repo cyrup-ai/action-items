@@ -82,3 +82,29 @@ pub fn load_preferred_alternatives(
 ) {
     prefs_state.available_alternatives = hotkey_prefs.preferred_combinations.clone();
 }
+#[derive(Resource, Default)]
+pub struct HotkeyCaptureUIState {
+    /// Whether preferences window is visible
+    pub visible: bool,
+    
+    /// Is the hotkey input field focused?
+    pub input_focused: bool,
+    
+    /// Current hotkey status for UI display
+    pub current_status: HotkeyStatus,
+    
+    /// Whether currently testing a hotkey
+    pub testing_hotkey: bool,
+    
+    /// Available alternative hotkey combinations
+    pub available_alternatives: Vec<HotkeyDefinition>,
+}
+
+/// Scan for available hotkey combinations using user preferences
+#[inline]
+pub fn scan_for_available_hotkeys(
+    capture_ui_state: &mut HotkeyCaptureUIState,
+    hotkey_prefs: &HotkeyPreferences,
+) {
+    capture_ui_state.available_alternatives = hotkey_prefs.preferred_combinations.clone();
+}

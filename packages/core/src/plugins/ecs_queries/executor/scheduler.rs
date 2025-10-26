@@ -101,10 +101,22 @@ impl<'w, 's> PluginExecutor<'w, 's> {
             return verify_cached_capabilities(&metadata, action_id);
         }
 
-        // Check native plugins with compile-time verification
+        // Check native plugins with security verification
         for plugin in self.native_plugins.iter() {
             if plugin.id == plugin_id {
-                return verify_native_capabilities(plugin, action_id);
+                return match verify_native_capabilities(plugin, action_id) {
+                    Ok(granted) => granted,
+                    Err(e) => {
+                        tracing::error!(
+                            target: "plugin_executor",
+                            plugin_id = plugin_id,
+                            action_id = action_id,
+                            error = %e,
+                            "Security verification failed in can_execute"
+                        );
+                        false
+                    },
+                };
             }
         }
 

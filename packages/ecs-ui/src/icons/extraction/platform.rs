@@ -43,8 +43,10 @@ pub fn extract_icon_from_file(path: &Path, size: u32) -> Option<(Vec<u8>, u32, u
 /// - .ico file parsing for direct icon files
 #[cfg(target_os = "windows")]
 fn extract_windows_icon(_path: &Path, _size: u32) -> Option<(Vec<u8>, u32, u32)> {
-    // Windows icon extraction implementation goes here
-    // For now, return None to use fallback
+    // TODO: Platform-specific icon extraction not yet implemented
+    // Will use SHGetFileInfo and IExtractIcon for icon extraction
+    // Falls back to FontAwesome/generic icons when None
+    // See packages/ui/src/ui/icons/utils.rs for fallback logic
     None
 }
 
@@ -56,9 +58,10 @@ fn extract_windows_icon(_path: &Path, _size: u32) -> Option<(Vec<u8>, u32, u32)>
 /// - RGBA conversion from NSBitmapImageRep
 #[cfg(target_os = "macos")]
 fn extract_macos_icon(_path: &Path, _size: u32) -> Option<(Vec<u8>, u32, u32)> {
-    // macOS icon extraction implementation goes here
-    // Uses NSWorkspace and NSImage APIs
-    // For now, return None to use fallback
+    // TODO: Platform-specific icon extraction not yet implemented
+    // Will use NSWorkspace.iconForFile() and NSImage APIs
+    // Falls back to FontAwesome/generic icons when None
+    // See packages/ui/src/ui/icons/utils.rs for fallback logic
     None
 }
 
@@ -70,8 +73,9 @@ fn extract_macos_icon(_path: &Path, _size: u32) -> Option<(Vec<u8>, u32, u32)> {
 /// - Use gtk/gio APIs if available
 #[cfg(target_os = "linux")]
 fn extract_linux_icon(_path: &Path, _size: u32) -> Option<(Vec<u8>, u32, u32)> {
-    // Linux icon extraction implementation goes here
-    // Uses freedesktop icon theme or file manager APIs
-    // For now, return None to use fallback
+    // TODO: Platform-specific icon extraction not yet implemented
+    // Will use freedesktop icon themes and .desktop file parsing
+    // Falls back to FontAwesome/generic icons when None
+    // See packages/ui/src/ui/icons/utils.rs for fallback logic
     None
 }

@@ -57,7 +57,6 @@ use crate::wizard::{
     },
 };
 use crate::wizard::first_run::{
-    FirstRunFileOperations,
     // First-run system function imports
     initiate_first_run_check, handle_wizard_completion, check_should_start_wizard,
 };
@@ -196,9 +195,9 @@ impl PermissionWizardPlugin {
 
 impl Plugin for PermissionWizardPlugin {
     fn build(&self, app: &mut App) {
-        // Add ecs-ui plugin group FIRST
-        app.add_plugins(UiLunexPlugins);
-        
+        // Note: UiLunexPlugins should be added by the main app, not here
+        // This plugin assumes UI system is already initialized
+
         // Initialize wizard state machine
         app.init_state::<WizardState>();
         
@@ -439,9 +438,6 @@ impl Plugin for PermissionWizardPlugin {
                 OnExit(WizardState::Complete),
                 handle_wizard_completion
             );
-            
-            // Add missing resource
-            app.init_resource::<FirstRunFileOperations>();
         }
         
         // Observer system registrations

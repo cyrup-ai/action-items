@@ -182,9 +182,8 @@ pub fn request_admin_access(tx: Sender<Result<PermissionStatus, PermissionError>
                     if is_member.as_bool() {
                         Ok(PermissionStatus::Authorized)
                     } else {
-                        // Could potentially elevate or request UAC here, but for now just
-                        // return current status
-                        Ok(PermissionStatus::Denied)
+                        // Not admin member: require UAC elevation for privileged operations
+                        Ok(PermissionStatus::PromptRequired)
                     }
                 } else {
                     Ok(PermissionStatus::Denied)

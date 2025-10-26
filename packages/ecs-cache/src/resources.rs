@@ -23,7 +23,7 @@ impl CacheManager {
         }
     }
 
-    pub fn create_partition(
+    pub async fn create_partition(
         &mut self,
         name: impl Into<String>,
         config: CachePartitionConfig,
@@ -35,6 +35,7 @@ impl CacheManager {
             .hot_tier_max_entries(config.hot_tier_capacity as u32)
             .warm_tier_max_entries(config.warm_tier_capacity)
             .build()
+            .await
             .map_err(|e| format!("Failed to create cache partition '{}': {:?}", name, e))?;
 
         self.partitions.insert(name.clone(), cache);
@@ -54,18 +55,8 @@ impl CacheManager {
 
 impl Default for CacheManager {
     fn default() -> Self {
-        let mut manager = Self::new();
-
-        // Create default partitions
-        let default_config = CachePartitionConfig::default();
-
-        let _ = manager.create_partition("plugin_metadata", default_config.clone());
-        let _ = manager.create_partition("search_results", default_config.clone());
-        let _ = manager.create_partition("ui_assets", default_config.clone());
-        let _ = manager.create_partition("configuration", default_config.clone());
-        let _ = manager.create_partition("api_responses", default_config);
-
-        manager
+        // Create empty manager - partitions will be created by startup system
+        Self::new()
     }
 }
 

@@ -5,7 +5,6 @@
 
 pub mod app_config;
 pub mod events;
-pub mod hotkey_setup;
 pub mod systems;
 pub mod window_config;
 pub mod window_resize;

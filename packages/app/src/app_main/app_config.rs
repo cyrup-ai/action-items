@@ -16,12 +16,10 @@ use action_items_ui::{LauncherUiPlugin, MonitorConstraintsPlugin, UiVisibilityEv
 use bevy::prelude::*;
 use bevy::state::state::States;
 // Wizard now handled by ecs-permissions service
-use ecs_notifications::{NotificationBuilder, Platform};
 use bevy::log::{LogPlugin, Level, BoxedLayer};
 #[cfg(target_os = "macos")]
 use bevy::window::CompositeAlphaMode;
 use bevy::window::{Window, WindowLevel, WindowMode};
-use bevy::winit::{WakeUp, WinitPlugin};
 use ecs_filesystem::FileSystemPlugin;
 use ecs_hotkey::HotkeyPlugin;
 use ecs_launcher::{HotkeyLauncherBridgePlugin, LauncherPlugin as EcsLauncherService};
@@ -35,7 +33,7 @@ use action_items_ecs_user_settings::UserSettingsPlugin;
 use ecs_tls::TlsCleanupPlugin;
 
 use crate::events::handlers::preferences::PendingFileOperations;
-use crate::events::{GlobalHotkeyEvent, PreferencesEvent};
+use crate::events::PreferencesEvent;
 use crate::input::{LauncherHotkeys, SearchQuery, TextInputChanged};
 use crate::overlay_window::OverlayWindowPlugin;
 // Permissions now handled by ECS service
@@ -122,21 +120,16 @@ fn file_logging_layer(_app: &mut App) -> Option<BoxedLayer> {
 
 /// Configure the main Bevy app with all plugins, resources, and events
 pub fn configure_app() -> App {
-    // Use custom WinitPlugin for proper global hotkey event integration
-    let winit_plugin = WinitPlugin::<GlobalHotkeyEvent>::default();
-
     let mut app = App::new();
 
     app.add_plugins(
         DefaultPlugins
             .build()
-            .disable::<WinitPlugin<WakeUp>>()
             .set(LogPlugin {
                 level: Level::DEBUG,
                 filter: "wgpu=error,naga=warn,bevy_render=info,bevy_ecs=info".into(),
                 custom_layer: file_logging_layer,
             })
-            .add(winit_plugin)
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     title: "Action Items".into(),
@@ -177,6 +170,8 @@ pub fn configure_app() -> App {
         SearchUIPlugin::default(), // Search UI components
         SearchAggregatorPlugin, // Search coordination across plugins ✅
     ))
+    // UI system must be added BEFORE plugins that depend on it
+    .add_plugins(UiLunexPlugins)  // UI service coordination - ENABLED ✅
     // ECS Service ecosystem - Core services
     .add_plugins((
         BluetoothPlugin,              // Cross-platform Bluetooth operations ✅
@@ -185,17 +180,15 @@ pub fn configure_app() -> App {
         PermissionPlugin,             // ECS permissions service ✅
         PermissionWizardPlugin::default()
             .with_required_permissions(vec![
-                PermissionType::Accessibility,
-                PermissionType::FullDiskAccess,
-                PermissionType::Camera,
-                PermissionType::Microphone,
+                PermissionType::Accessibility,  // Required for global hotkeys
+                PermissionType::Microphone,     // Required for STT
+                PermissionType::FullDiskAccess, // Required for file management
             ])
-            .with_reason("Action Items requires these permissions to function properly. Accessibility enables global hotkeys, Full Disk Access allows file management, and Camera/Microphone support media features."), // Permission setup wizard with first-run permissions ✅
+            .with_reason("Action Items requires these permissions to function properly. Accessibility enables global hotkeys, Microphone enables speech-to-text, and Full Disk Access allows file management."), // Permission setup wizard with core permissions ✅
         // MacosPermissionsPlugin replaced by ECS PermissionPlugin above
         NotificationSystemPlugin, // Enterprise notification system ✅
         HttpPlugin::default(),    // HTTP client service ✅
         ProgressPlugin::<AppState>::new(), // Progress tracking service ✅
-        UiLunexPlugins,          // UI service coordination - ENABLED ✅
         TlsCleanupPlugin, // TLS/certificate management ✅
     ))
     // ECS Service ecosystem - UI and user preferences
@@ -255,27 +248,6 @@ fn insert_app_resources(app: &mut App) -> &mut App {
     .init_resource::<crate::window::state::ViewportState>()
     .init_resource::<ecs_service_bridge::systems::plugin_management::capability_index::PluginCapabilityIndex>();
 
-    // Initialize AppGlobalHotkeyManager with proper error handling for accessibility permissions
-    match global_hotkey::GlobalHotKeyManager::new() {
-        Ok(manager) => {
-            app.insert_resource(ecs_hotkey::AppGlobalHotkeyManager {
-                manager,
-                toggle_hotkey: global_hotkey::hotkey::HotKey::new(
-                    Some(global_hotkey::hotkey::Modifiers::SUPER | global_hotkey::hotkey::Modifiers::SHIFT),
-                    global_hotkey::hotkey::Code::Space,
-                ),
-            });
-            tracing::info!("✅ AppGlobalHotkeyManager initialized successfully");
-        }
-        Err(e) => {
-            warn!("Failed to initialize GlobalHotkeyManager: {}", e);
-            warn!("Global hotkeys will be disabled. This is usually due to missing accessibility permissions on macOS.");
-            
-            // Register system to show accessibility permission notification during PostStartup
-            app.add_systems(PostStartup, show_accessibility_permission_notification);
-        }
-    }
-
     // Install custom panic hook for proper file logging
     // Must be done after LogPlugin initialization to ensure tracing is set up
     install_panic_hook_for_file_logging();
@@ -329,7 +301,6 @@ fn install_panic_hook_for_file_logging() {
 /// Add all application events
 fn add_app_events(app: &mut App) {
     app.add_event::<LauncherEvent>()
-        .add_event::<GlobalHotkeyEvent>()
         .add_event::<PreferencesEvent>()
         .add_event::<ecs_filesystem::FileSystemRequest>()
         .add_event::<ecs_filesystem::FileSystemResponse>()
@@ -337,30 +308,4 @@ fn add_app_events(app: &mut App) {
         .add_event::<TextInputChanged>()
         .add_event::<bevy::window::WindowResized>()
         .add_event::<action_items_ui::SearchQueryChanged>();
-}
-
-/// System to show accessibility permission notification using ecs-notifications
-/// Runs during PostStartup to avoid CommandQueue issues during app initialization
-fn show_accessibility_permission_notification(mut commands: Commands) {
-    let exe_path = std::env::current_exe()
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|_| "/Volumes/samsung_t9/action-items/target/debug/action_items".to_string());
-
-    let notification = NotificationBuilder::new()
-        .with_title("Accessibility Permission Required")
-        .with_body(ecs_notifications::RichText::plain(format!(
-            "Action Items needs accessibility permissions to enable global hotkeys (Cmd+Shift+Space).\n\n\
-            To grant permission:\n\
-            1. Open System Preferences > Security & Privacy > Privacy > Accessibility\n\
-            2. Click the lock icon and enter your password\n\
-            3. Click '+' and navigate to:\n   {}\n\
-            4. Check the box next to 'action_items'\n\
-            5. Restart Action Items\n\n\
-            The app will work without this permission, but global hotkeys will be disabled.", exe_path
-        )))
-        .with_priority(ecs_notifications::Priority::High)
-        .with_platforms(vec![Platform::MacOS])
-        .build();
-
-    commands.spawn(notification);
 }

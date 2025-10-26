@@ -16,12 +16,20 @@ pub fn execute_native_action(
     let plugin_arc = plugin_component.plugin.clone();
     let action_id_owned = action_id.to_string();
 
-    // Verify plugin capabilities before execution using thread-safe cache
-    if !verify_native_capabilities(plugin_component, action_id) {
-        return Err(crate::error::Error::PluginError(format!(
-            "Plugin {} lacks required capabilities for action {}",
-            plugin_component.id, action_id
-        )));
+    // Verify plugin capabilities before execution using production security verification
+    match verify_native_capabilities(plugin_component, action_id) {
+        Ok(true) => {
+            // Verification passed; continue with execution
+        },
+        Ok(false) => {
+            return Err(crate::error::Error::PluginError(format!(
+                "Plugin {} lacks required capabilities for action {}",
+                plugin_component.id, action_id
+            )));
+        },
+        Err(e) => {
+            return Err(e);
+        },
     }
 
     if let Some(mut plugin_guard) = plugin_arc.try_write() {
@@ -45,123 +53,42 @@ pub fn execute_native_action(
     }
 }
 
-/// Verify native plugin capabilities with comprehensive security verification (replaces boolean
-/// stub)
-pub fn verify_native_capabilities(plugin: &PluginComponent, action_id: &str) -> bool {
-    use ecs_service_bridge::resources::Capability;
-    use ecs_service_bridge::systems::plugin_management::capability_index::PluginCapabilityIndex;
+/// Verify native plugin capabilities with production-grade security verification
+pub fn verify_native_capabilities(
+    plugin: &PluginComponent,
+    action_id: &str,
+) -> crate::error::Result<bool> {
+    use crate::plugins::security::CapabilityVerifier;
 
-    // Create capability verifier for this verification
-    let mut verifier = PluginCapabilityIndex::new();
-
-    // Map action_id to specific capability with appropriate permissions
-    let capability = match action_id {
-        "search" => {
-            if plugin.capabilities.contains(&"search".to_string()) {
-                Capability::new(
-                    "search".to_string(),
-                    "1.0.0".to_string(),
-                    "Search capability".to_string(),
-                )
-            } else {
-                log::warn!(
-                    target: "native_capability_verification",
-                    "Plugin {} does not declare search capability but requested search action",
-                    plugin.id
-                );
-                return false;
-            }
-        },
-        "execute" => {
-            if plugin.capabilities.contains(&"execute".to_string()) {
-                Capability::new(
-                    "execute".to_string(),
-                    "1.0.0".to_string(),
-                    "Execute capability".to_string(),
-                )
-            } else {
-                log::warn!(
-                    target: "native_capability_verification",
-                    "Plugin {} does not declare execute capability but requested execute action",
-                    plugin.id
-                );
-                return false;
-            }
-        },
-        "filesystem" => {
-            if plugin.capabilities.contains(&"filesystem".to_string()) {
-                Capability::new(
-                    "filesystem".to_string(),
-                    "1.0.0".to_string(),
-                    "Filesystem capability".to_string(),
-                )
-            } else {
-                log::warn!(
-                    target: "native_capability_verification",
-                    "Plugin {} does not declare filesystem capability but requested filesystem action",
-                    plugin.id
-                );
-                return false;
-            }
-        },
-        "network" => {
-            if plugin.capabilities.contains(&"network".to_string()) {
-                Capability::new(
-                    "network".to_string(),
-                    "1.0.0".to_string(),
-                    "Network capability".to_string(),
-                )
-            } else {
-                log::warn!(
-                    target: "native_capability_verification",
-                    "Plugin {} does not declare network capability but requested network action",
-                    plugin.id
-                );
-                return false;
-            }
-        },
-        _ => {
-            // SECURITY: No longer allow unknown actions - comprehensive verification required
-            log::error!(
-                target: "native_capability_verification",
-                "Plugin {} requested unknown action '{}' - security verification failed",
-                plugin.id,
-                action_id
-            );
-            return false;
-        },
-    };
-
-    // Perform comprehensive security verification (replaces "return true" stub)
-    match verifier.verify_capability(&plugin.id, &capability.name) {
+    let verifier = CapabilityVerifier::new()?;
+    match verifier.verify_capability(&plugin.id, &plugin.config.manifest, action_id) {
         Ok(granted) => {
             if granted {
-                log::debug!(
+                tracing::debug!(
                     target: "native_capability_verification",
-                    "Security verification passed for plugin {} action '{}'",
-                    plugin.id,
-                    action_id
+                    plugin_id = %plugin.id,
+                    action_id = action_id,
+                    "Security verification passed"
                 );
-                true
             } else {
-                log::warn!(
+                tracing::warn!(
                     target: "native_capability_verification",
-                    "Security verification failed for plugin {} action '{}'",
-                    plugin.id,
-                    action_id
+                    plugin_id = %plugin.id,
+                    action_id = action_id,
+                    "Security verification denied - capability not granted"
                 );
-                false
             }
+            Ok(granted)
         },
         Err(e) => {
-            log::error!(
+            tracing::error!(
                 target: "native_capability_verification",
-                "Error during capability verification for plugin {} action '{}': {}",
-                plugin.id,
-                action_id,
-                e
+                plugin_id = %plugin.id,
+                action_id = action_id,
+                error = %e,
+                "Security verification failed"
             );
-            false
+            Err(e)
         },
     }
 }

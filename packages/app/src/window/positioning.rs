@@ -213,25 +213,34 @@ pub fn detect_monitors_system(
         info!("Monitor disconnected: {:?}", removed_entity);
     }
 
-    // Update ScreenDimensions and ViewportState resources based on current active monitor
-    // Zero-allocation update with optimized error handling
-    if let Ok(dimensions) = get_active_screen_dimensions(&active_monitor, &monitors_query) {
-        *screen_dimensions = dimensions;
-        viewport_state.update_from_screen_dimensions(&dimensions);
+    // Update ScreenDimensions and ViewportState ONLY when ActiveMonitor changes
+    // This prevents checking dimensions every frame when nothing has changed
+    if active_monitor.is_changed() {
+        if let Ok(dimensions) = get_active_screen_dimensions(&active_monitor, &monitors_query) {
+            // Check if dimensions have actually changed before updating
+            let dimensions_changed = screen_dimensions.width != dimensions.width
+                || screen_dimensions.height != dimensions.height
+                || screen_dimensions.scale_factor != dimensions.scale_factor;
 
-        info!(
-            "Screen dimensions updated: {}x{} (logical: {:.0}x{:.0}) @{:.1}x scale",
-            dimensions.width,
-            dimensions.height,
-            dimensions.logical_width,
-            dimensions.logical_height,
-            dimensions.scale_factor
-        );
+            if dimensions_changed {
+                *screen_dimensions = dimensions;
+                viewport_state.update_from_screen_dimensions(&dimensions);
 
-        info!(
-            "Viewport conversion ratios: width={:.6}, height={:.6}",
-            viewport_state.width_ratio, viewport_state.height_ratio
-        );
+                info!(
+                    "Screen dimensions updated: {}x{} (logical: {:.0}x{:.0}) @{:.1}x scale",
+                    dimensions.width,
+                    dimensions.height,
+                    dimensions.logical_width,
+                    dimensions.logical_height,
+                    dimensions.scale_factor
+                );
+
+                info!(
+                    "Viewport conversion ratios: width={:.6}, height={:.6}",
+                    viewport_state.width_ratio, viewport_state.height_ratio
+                );
+            }
+        }
     }
 }
 
