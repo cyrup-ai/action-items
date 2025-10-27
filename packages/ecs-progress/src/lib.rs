@@ -139,17 +139,22 @@ pub mod prelude {
 pub use prelude::*;
 
 // Module declarations
+/// Entity-based progress tracking components
 pub mod entity;
 mod monitor;
 mod plugin;
 mod progress;
 mod state;
 mod system;
+/// Utility functions and helper systems for progress tracking
 pub mod utils;
 
+/// Asset loading progress tracking (enabled with "assets" feature)
 #[cfg(feature = "assets")]
 mod assets;
+/// Debug logging and monitoring (enabled with "debug" feature)
 #[cfg(feature = "debug")]
 mod debug;
+/// Async progress updates from background threads (enabled with "async" feature)
 #[cfg(feature = "async")]
 mod send;

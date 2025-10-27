@@ -1,6 +1,7 @@
 //! Tests for prioritization.rs
 
 use action_items_ecs_fetch::prioritization::*;
+use action_items_ecs_fetch::RequestPriority;
 use std::time::{Duration, Instant};
 
 #[test]

@@ -42,8 +42,8 @@ fn handle_permission_changes(
     mut events: EventReader<action_items_ecs_permissions::PermissionChanged>,
 ) {
     for event in events.read() {
-        if event.permission_type == PermissionType::Camera {
-            match event.new_status {
+        if event.typ == PermissionType::Camera {
+            match event.status {
                 PermissionStatus::Authorized => {
                     info!("Camera access granted! You can now use the camera.");
                 }
@@ -51,7 +51,7 @@ fn handle_permission_changes(
                     warn!("Camera access denied. Some features may not work.");
                 }
                 _ => {
-                    info!("Camera permission changed to: {}", event.new_status);
+                    info!("Camera permission changed to: {}", event.status);
                 }
             }
         }

@@ -1,0 +1,27 @@
+[package]
+name = "action_items_ecs_media"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+bevy = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+
+# Non-workspace dependencies
+chrono = { version = "0.4", features = ["serde"] }
+mime_guess = "2.0"
+
+# SurrealDB - must use project fork SDK crate
+surrealdb = { path = "../../forks/surrealdb/crates/sdk", features = ["kv-surrealkv", "kv-mem"] }
+
+# Internal dependencies
+action_items_ecs_surrealdb = { path = "../ecs-surrealdb" }
+ecs-filesystem = { path = "../ecs-filesystem" }
+
+[lib]
+name = "action_items_ecs_media"
+path = "src/lib.rs"

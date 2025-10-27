@@ -29,7 +29,8 @@ members = [
     "packages/ecs-filesystem",
     "packages/ecs-compression",
     "packages/ecs-native-menu",
-    "packages/ecs-user-settings"
+    "packages/ecs-user-settings",
+    "packages/ecs-media"
 ]
 exclude = ["tmp", "docs", "forks/surrealdb"]
 resolver = "3"

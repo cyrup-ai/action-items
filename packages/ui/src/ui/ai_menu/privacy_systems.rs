@@ -187,7 +187,7 @@ pub fn update_privacy_icon_gradients_system(
     }
 }
 
-/// Legacy system for backward compatibility with non-gradient privacy icons
+/// Fallback system for non-gradient privacy icons
 /// Zero-allocation fallback system for privacy icons that haven't been upgraded to gradient system
 #[inline]
 pub fn update_privacy_icon_visuals_system(
@@ -305,7 +305,7 @@ fn calculate_privacy_border_color(is_active: bool, hover_state: HoverState) -> C
 
 /// Calculate indicator colors based on active state and hover state
 /// Returns (background_color, border_color) for efficient visual updates
-/// Maintained for backward compatibility with legacy privacy icons
+/// Maintained as fallback for non-gradient privacy icon rendering
 #[inline]
 fn calculate_indicator_colors(is_active: bool, hover_state: HoverState) -> (Color, Color) {
     // Theme colors for privacy indicators
@@ -396,7 +396,7 @@ impl Plugin for PrivacyIndicatorPlugin {
                     animate_privacy_info_panel_system,
                     // Gradient-based visual updates (preferred)
                     update_privacy_icon_gradients_system,
-                    // Legacy color-based updates (fallback)
+                    // Fallback color-based updates (for non-gradient icons)
                     update_privacy_icon_visuals_system,
                     handle_privacy_info_toggle_system,
                     handle_privacy_status_events_system,

@@ -23,8 +23,9 @@ pub mod tracing;
 // Re-export commonly used types
 pub use components::{HttpRequest, RequestTimeout, RetryPolicy};
 pub use events::{
-    HttpRequestCancelled, HttpRequestFailed, HttpRequestRetryRequested, HttpRequestSubmitted,
-    HttpResponseReceived, RateLimitExceeded,
+    CorrelationId, HttpOperationId, HttpRequestCancelled, HttpRequestFailed,
+    HttpRequestRetryRequested, HttpRequestSubmitted, HttpResponseReceived, RateLimitExceeded,
+    RequestPriority,
 };
 // Cache integration types are already re-exported by cache_integration.rs via pub use cache_integration::*;
 pub use http::HeaderMap;

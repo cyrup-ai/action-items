@@ -1,7 +1,7 @@
 //! Tests for plugin.rs
 
 use action_items_ecs_fetch::plugin::*;
-use action_items_ecs_fetch::prioritization::RequestPriority;
+use action_items_ecs_fetch::RequestPriority;
 use std::time::Duration;
 
 #[test]
@@ -31,10 +31,10 @@ fn test_http_request_builder() {
         .timeout(Duration::from_secs(60))
         .priority(RequestPriority::High);
 
-    assert_eq!(builder.method, reqwest::Method::GET);
-    assert_eq!(builder.url, "https://example.com/api");
-    assert_eq!(builder.timeout, Duration::from_secs(60));
-    assert!(matches!(builder.priority, RequestPriority::High));
+    assert_eq!(builder.method(), &reqwest::Method::GET);
+    assert_eq!(builder.url(), "https://example.com/api");
+    assert_eq!(builder.get_timeout(), Duration::from_secs(60));
+    assert!(matches!(builder.get_priority(), RequestPriority::High));
 }
 
 #[test]

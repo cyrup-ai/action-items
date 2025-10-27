@@ -237,7 +237,7 @@ impl HttpTracingManager {
     }
 
     /// Check if request should be sampled
-    fn should_sample(&self, config: &HttpTracingConfig) -> bool {
+    pub fn should_sample(&self, config: &HttpTracingConfig) -> bool {
         if config.sampling_ratio >= 1.0 {
             return true;
         }
@@ -288,19 +288,19 @@ impl HttpTracingManager {
     }
 
     /// Extract URL scheme
-    fn extract_scheme(&self, url: &str) -> Option<String> {
+    pub fn extract_scheme(&self, url: &str) -> Option<String> {
         url::Url::parse(url).ok().map(|u| u.scheme().to_string())
     }
 
     /// Extract URL host
-    fn extract_host(&self, url: &str) -> Option<String> {
+    pub fn extract_host(&self, url: &str) -> Option<String> {
         url::Url::parse(url)
             .ok()
             .and_then(|u| u.host_str().map(|h| h.to_string()))
     }
 
     /// Extract URL path
-    fn extract_path(&self, url: &str) -> Option<String> {
+    pub fn extract_path(&self, url: &str) -> Option<String> {
         url::Url::parse(url).ok().map(|u| u.path().to_string())
     }
 

@@ -86,7 +86,8 @@ pub mod jemalloc_profiler;
 #[cfg(feature = "dhat-heap")]
 pub mod dhat_profiler;
 
-// Automated testing framework
+// Automated testing framework - only compiled in test builds
+#[cfg(test)]
 pub mod testing;
 
 // Re-export core types for convenience

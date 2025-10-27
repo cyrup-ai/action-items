@@ -3,7 +3,6 @@
 use bevy::prelude::*;
 use bevy::ecs::schedule::Schedule;
 use action_items_ecs_progress::prelude::*;
-use action_items_ecs_progress::utils::*;
 
 #[test]
 fn test_wait_frames() {

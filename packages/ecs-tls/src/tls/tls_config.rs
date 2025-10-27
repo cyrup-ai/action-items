@@ -282,23 +282,4 @@ impl TlsManager {
     async fn check_crl_cache_exists(&self, cache_key: &str) -> bool {
         self.crl_cache.has_cached_entry(cache_key).await
     }
-
-    /// Start OCSP cleanup task
-    /// Note: Modern implementation uses Bevy ECS systems - this method is for compatibility
-    #[allow(dead_code)] // Legacy API compatibility method
-    pub fn start_ocsp_cleanup_task(&self) {
-        // OCSP cleanup is now handled by TlsCleanupPlugin in Bevy ECS
-        // This method exists for API compatibility but delegates to ECS systems
-        tracing::info!("OCSP cleanup managed by TlsCleanupPlugin - no explicit task needed");
-    }
-
-    /// Start CRL cleanup task  
-    /// Note: Modern implementation uses Bevy ECS systems - this method is for compatibility
-    #[allow(dead_code)] // Legacy API compatibility method
-    #[allow(dead_code)] // Legacy API method - CRL cleanup now handled by Bevy TlsCleanupPlugin
-    pub fn start_crl_cleanup_task(&self) {
-        // CRL cleanup is now handled by TlsCleanupPlugin in Bevy ECS
-        // This method exists for API compatibility but delegates to ECS systems
-        tracing::info!("CRL cleanup managed by TlsCleanupPlugin - no explicit task needed");
-    }
 }

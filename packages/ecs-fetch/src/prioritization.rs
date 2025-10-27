@@ -136,7 +136,7 @@ impl PrioritizedRequest {
     }
 
     /// Convert RequestPriority to numeric value
-    fn priority_to_value(priority: RequestPriority) -> u8 {
+    pub fn priority_to_value(priority: RequestPriority) -> u8 {
         match priority {
             RequestPriority::Critical => 100,
             RequestPriority::High => 80,

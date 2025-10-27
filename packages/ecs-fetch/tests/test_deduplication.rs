@@ -3,7 +3,6 @@
 use action_items_ecs_fetch::deduplication::*;
 use bytes::Bytes;
 use reqwest::Method;
-use std::time::Instant;
 
 #[test]
 fn test_request_fingerprint_url_based() {

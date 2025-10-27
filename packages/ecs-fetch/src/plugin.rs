@@ -530,6 +530,26 @@ impl HttpRequestBuilder {
         self
     }
 
+    /// Get the HTTP method
+    pub fn method(&self) -> &reqwest::Method {
+        &self.method
+    }
+
+    /// Get the URL
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    /// Get the timeout duration
+    pub fn get_timeout(&self) -> Duration {
+        self.timeout
+    }
+
+    /// Get the request priority
+    pub fn get_priority(&self) -> RequestPriority {
+        self.priority
+    }
+
     /// Send the request
     pub fn send(
         self,

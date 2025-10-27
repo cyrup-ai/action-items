@@ -64,6 +64,7 @@ fn test_chunk_metadata() {
         compressed_size: Some(512),
         hash: Some(12345),
         encoding: Some("gzip".to_string()),
+        decompressed: false,
     };
 
     assert_eq!(metadata.original_size, 1024);
