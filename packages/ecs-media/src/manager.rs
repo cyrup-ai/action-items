@@ -251,13 +251,13 @@ impl MediaManager {
         db: &DatabaseService,
         conversation_id: &str,
     ) -> Result<Vec<Media>, MediaError> {
-        // Query media by conversation_id
-        let query = "SELECT * FROM media WHERE conversation_id = $conv_id ORDER BY created_at DESC";
+        // Query media by conversation_id using string formatting (matching update_description pattern)
+        let query = format!(
+            "SELECT * FROM media WHERE conversation_id = '{}' ORDER BY created_at DESC",
+            conversation_id.replace('\'', "\\'")
+        );
         
-        let mut params = std::collections::HashMap::new();
-        params.insert("conv_id".to_string(), surrealdb::Value::from(conversation_id.to_string()));
-        
-        let mut result = db.query_with_params(query, params)
+        let mut result = db.query(&query)
             .await
             .map_err(|e| MediaError::DatabaseError(e.to_string()))?;
         
