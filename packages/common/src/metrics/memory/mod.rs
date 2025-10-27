@@ -105,6 +105,7 @@ pub use enhanced_tracker::{
 pub use jemalloc_profiler::{
     JemallocConfig, JemallocProfiler, JemallocStats, MemoryProfilingError, analysis::LeakAnalysis,
 };
+#[cfg(test)]
 pub use testing::{
     LeakTestScenario, MemoryLeakTestSuite, MemoryThresholds, TestCategory, TestMemoryStats,
     TestMemoryUsage, TestResult, TestResults, TestStatus, scenarios,
@@ -123,6 +124,7 @@ pub struct MemoryMonitoringSystem {
     jemalloc_profiler: Option<JemallocProfiler>,
     #[cfg(feature = "dhat-heap")]
     dhat_profiler: Option<DhatProfiler>,
+    #[cfg(test)]
     leak_test_suite: MemoryLeakTestSuite,
 }
 
@@ -156,7 +158,10 @@ impl MemoryMonitoringSystem {
             },
         };
 
+        #[cfg(test)]
         let mut leak_test_suite = MemoryLeakTestSuite::new();
+
+        #[cfg(test)]
         leak_test_suite
             .initialize_tracking()
             .map_err(|e| MemorySystemError::TestingError(e.to_string()))?;
@@ -172,6 +177,7 @@ impl MemoryMonitoringSystem {
             #[cfg(feature = "dhat-heap")]
             dhat_profiler,
 
+            #[cfg(test)]
             leak_test_suite,
         })
     }
@@ -180,6 +186,8 @@ impl MemoryMonitoringSystem {
     fn new_fallback() -> Self {
         let base_tracker = Arc::new(MemoryTracker::new());
         let enhanced_tracker = Arc::new(EnhancedMemoryTracker::new(base_tracker));
+        
+        #[cfg(test)]
         let leak_test_suite = MemoryLeakTestSuite::new(); // Don't initialize tracking in fallback
 
         Self {
@@ -191,6 +199,7 @@ impl MemoryMonitoringSystem {
             #[cfg(feature = "dhat-heap")]
             dhat_profiler: None, // No profiling in fallback
 
+            #[cfg(test)]
             leak_test_suite,
         }
     }
@@ -258,6 +267,7 @@ impl MemoryMonitoringSystem {
     }
 
     /// Run comprehensive memory leak tests
+    #[cfg(test)]
     pub async fn run_comprehensive_tests(&mut self) -> Result<TestResults, MemorySystemError> {
         info!("Running comprehensive memory leak tests");
 
@@ -294,6 +304,7 @@ impl MemoryMonitoringSystem {
     }
 
     /// Get test suite for custom testing
+    #[cfg(test)]
     pub fn test_suite_mut(&mut self) -> &mut MemoryLeakTestSuite {
         &mut self.leak_test_suite
     }

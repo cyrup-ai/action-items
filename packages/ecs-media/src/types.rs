@@ -2,6 +2,38 @@ use serde::{Deserialize, Serialize};
 use surrealdb::RecordId;
 use uuid::Uuid;
 
+/// Maximum media file size (10MB default, configurable via MediaConfig)
+pub const DEFAULT_MAX_MEDIA_SIZE: u64 = 10 * 1024 * 1024;
+
+/// Allowed MIME types for upload
+pub const ALLOWED_MIME_TYPES: &[&str] = &[
+    // Images
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+    // Videos
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "video/x-msvideo", // .avi
+    // Audio
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/wav",
+    "audio/webm",
+    "audio/mp4",
+    // Documents
+    "application/pdf",
+    "text/plain",
+];
+
+/// Check if MIME type is in the allowed list
+pub fn is_allowed_mime_type(mime_type: &str) -> bool {
+    ALLOWED_MIME_TYPES.contains(&mime_type)
+}
+
 /// Unique identifier for media records
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct MediaId(pub Uuid);

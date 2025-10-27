@@ -196,6 +196,26 @@ fn handle_media_requests(
                     }
                 })
             },
+            
+            MediaRequest::ListConversationMedia {
+                operation_id,
+                conversation_id,
+                requester,
+            } => {
+                let op_id = *operation_id;
+                let conv_id = conversation_id.clone();
+                let req = *requester;
+                
+                AsyncComputeTaskPool::get().spawn(async move {
+                    let result = manager.list_conversation_media(&db_clone, &conv_id).await;
+                    
+                    MediaResponse::ConversationMediaListed {
+                        operation_id: op_id,
+                        requester: req,
+                        result,
+                    }
+                })
+            },
         };
         
         commands.spawn(MediaTask(task));

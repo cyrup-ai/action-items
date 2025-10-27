@@ -58,12 +58,12 @@
 mod components;
 mod error;
 mod events;
-mod migration;
+pub mod migration;
 mod plugin;
 mod schema;
 mod systems;
 pub mod table_names;
-mod types;
+pub mod types;
 
 pub use components::*;
 pub use error::*;

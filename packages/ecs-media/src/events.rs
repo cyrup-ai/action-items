@@ -36,6 +36,13 @@ pub enum MediaRequest {
         media_id: MediaId,
         requester: Entity,
     },
+    
+    /// List all media for a conversation
+    ListConversationMedia {
+        operation_id: MediaId,
+        conversation_id: String,
+        requester: Entity,
+    },
 }
 
 /// Media operation responses
@@ -63,5 +70,11 @@ pub enum MediaResponse {
         operation_id: MediaId,
         requester: Entity,
         result: Result<(), MediaError>,
+    },
+    
+    ConversationMediaListed {
+        operation_id: MediaId,
+        requester: Entity,
+        result: Result<Vec<Media>, MediaError>,
     },
 }

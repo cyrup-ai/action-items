@@ -8,7 +8,7 @@
 //! - Error handling and edge cases
 
 use action_items_ecs_user_settings::types::{validate_table_name, parse_record_id, VALID_TABLES};
-use action_items_ecs_user_settings::error::SettingsError;
+use action_items_ecs_user_settings::SettingsError;
 
 #[test]
 fn test_all_valid_tables_accepted() {
