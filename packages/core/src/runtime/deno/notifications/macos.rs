@@ -45,7 +45,7 @@ impl MacosNotificationBackend {
 
     /// Check authorization status (blocks until resolved, no stubs)
     fn ensure_authorized(&self) -> bool {
-        let (lock, cvar) = &*self.auth_status;
+        let (lock, _cvar) = &*self.auth_status;
         
         // Fast path: Check if we already have cached authorization status
         {
@@ -61,7 +61,7 @@ impl MacosNotificationBackend {
         // No cached status - actively check and request authorization
         debug!("No cached authorization status, checking with UserNotifications");
         
-        autoreleasepool(|_| {
+        let check_timed_out = autoreleasepool(|_| {
             // Phase 1: Check current authorization status
             let check_complete = Arc::new((Mutex::new(false), Condvar::new()));
             let check_complete_clone = Arc::clone(&check_complete);
@@ -96,11 +96,13 @@ impl MacosNotificationBackend {
             let mut done = lock.lock();
             let timeout_result = cvar.wait_while_for(&mut done, |d| !*d, Duration::from_secs(5));
             
-            if timeout_result.timed_out() {
-                warn!("Authorization status check timed out");
-                return false;
-            }
+            timeout_result.timed_out()
         });
+        
+        if check_timed_out {
+            warn!("Authorization status check timed out");
+            return false;
+        }
         
         // Check if we need to request authorization
         let needs_request = {
@@ -111,7 +113,7 @@ impl MacosNotificationBackend {
         if needs_request {
             debug!("Authorization not determined, requesting user permission");
             
-            autoreleasepool(|_| {
+            let request_timed_out = autoreleasepool(|_| {
                 let request_complete = Arc::new((Mutex::new(false), Condvar::new()));
                 let request_complete_clone = Arc::clone(&request_complete);
                 let auth_status_clone = Arc::clone(&self.auth_status);
@@ -163,11 +165,13 @@ impl MacosNotificationBackend {
                 let mut done = lock.lock();
                 let timeout_result = cvar.wait_while_for(&mut done, |d| !*d, Duration::from_secs(10));
                 
-                if timeout_result.timed_out() {
-                    warn!("Authorization request timed out");
-                    return false;
-                }
+                timeout_result.timed_out()
             });
+            
+            if request_timed_out {
+                warn!("Authorization request timed out");
+                return false;
+            }
         }
         
         // Final check: Return authorization status

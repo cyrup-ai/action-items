@@ -393,7 +393,7 @@ impl DenoRuntimePool {
                 match runtime.resolve(result).await {
                     Ok(global_value) => {
                         // Use deno_core scope! macro to create v8 scope (replaces deprecated handle_scope())
-                        deno_core::scope!(scope, &mut runtime);
+                        deno_core::scope!(scope, runtime);
                         let local = v8::Local::new(scope, global_value);
 
                         // Serialize using serde_v8 for robust JavaScript type handling
@@ -412,8 +412,8 @@ impl DenoRuntimePool {
                             }
                         };
 
-                        // Convert to JSON string
-                        let json_value = serde_json::to_string(&v8_val.to_json())
+                        // Convert to JSON string - serde_v8::Value is already JSON-compatible
+                        let json_value = serde_json::to_string(&v8_val)
                             .map_err(|e| format!("JSON serialization error: {}", e))?;
 
                         Ok(json_value)

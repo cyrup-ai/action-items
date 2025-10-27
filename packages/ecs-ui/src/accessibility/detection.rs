@@ -168,8 +168,11 @@ mod macos {
         pub high_contrast: bool,
         pub reduced_motion: bool,
         pub large_text: bool,
+        #[allow(dead_code)] // Placeholder for future macOS implementation
         pub text_scale_factor: f32,
+        #[allow(dead_code)] // Placeholder for future macOS implementation
         pub magnifier_active: bool,
+        #[allow(dead_code)] // Placeholder for future macOS implementation
         pub narrator_active: bool,
         #[allow(dead_code)]
         pub accessibility_app_running: bool,

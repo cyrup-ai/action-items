@@ -134,22 +134,94 @@ pub struct CacheMetrics {
 }
 
 /// Statistics for individual cache partitions
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CachePartitionStats {
+    // Core metrics (existing)
     pub hits: u64,
     pub misses: u64,
     pub evictions: u64,
     pub writes: u64,
     pub total_size: usize,
     pub entry_count: usize,
+    
+    // NEW: Additional goldylox metrics
+    pub hot_tier_hits: u64,
+    pub warm_tier_hits: u64,
+    pub cold_tier_hits: u64,
+    pub avg_access_latency_ns: u64,
+    pub promotions: u64,
+    pub demotions: u64,
+    pub peak_memory_usage: usize,
+    pub ops_per_second: f32,
+    pub last_updated: Instant,
+}
+
+impl Default for CachePartitionStats {
+    fn default() -> Self {
+        Self {
+            hits: 0,
+            misses: 0,
+            evictions: 0,
+            writes: 0,
+            total_size: 0,
+            entry_count: 0,
+            hot_tier_hits: 0,
+            warm_tier_hits: 0,
+            cold_tier_hits: 0,
+            avg_access_latency_ns: 0,
+            promotions: 0,
+            demotions: 0,
+            peak_memory_usage: 0,
+            ops_per_second: 0.0,
+            last_updated: Instant::now(),
+        }
+    }
 }
 
 impl CachePartitionStats {
+    /// Create from Goldylox UnifiedStats
+    ///
+    /// CRITICAL: Use `compute_unified_stats()` method, not `get_snapshot()`
+    pub fn from_goldylox_stats(stats: &UnifiedStats) -> Self {
+        Self {
+            hits: stats.hot_tier_hits + stats.warm_tier_hits + stats.cold_tier_hits,
+            misses: stats.total_misses,
+            evictions: 0, // Goldylox doesn't expose evictions directly
+            writes: 0,    // Track separately if needed
+            total_size: stats.total_memory_usage as usize,
+            entry_count: 0, // Not directly available from stats
+            
+            // Goldylox-specific metrics
+            hot_tier_hits: stats.hot_tier_hits,
+            warm_tier_hits: stats.warm_tier_hits,
+            cold_tier_hits: stats.cold_tier_hits,
+            avg_access_latency_ns: stats.avg_access_latency_ns,
+            promotions: stats.promotions_performed,
+            demotions: stats.demotions_performed,
+            peak_memory_usage: stats.peak_memory_usage as usize,
+            ops_per_second: stats.ops_per_second,
+            last_updated: Instant::now(),
+        }
+    }
+    
     pub fn hit_ratio(&self) -> f64 {
         if self.hits + self.misses == 0 {
             return 0.0;
         }
         self.hits as f64 / (self.hits + self.misses) as f64
+    }
+    
+    /// Get tier distribution (hot, warm, cold percentages)
+    pub fn tier_distribution(&self) -> (f64, f64, f64) {
+        let total = self.hot_tier_hits + self.warm_tier_hits + self.cold_tier_hits;
+        if total == 0 {
+            return (0.0, 0.0, 0.0);
+        }
+        (
+            self.hot_tier_hits as f64 / total as f64,
+            self.warm_tier_hits as f64 / total as f64,
+            self.cold_tier_hits as f64 / total as f64,
+        )
     }
 }
 

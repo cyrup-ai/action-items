@@ -210,7 +210,7 @@ pub fn create_address_book_permission_screen() -> PermissionScreenContent {
 
     PermissionScreenContent::builder(PermissionType::AddressBook)
         .title("Address Book Access Required")
-        .description("This application needs access to your address book for legacy contact management features")
+        .description("This application needs access to your address book for contact management features")
         .platform_instructions(instructions)
         .icon('📇')
         .button_text("Grant Address Book Access")

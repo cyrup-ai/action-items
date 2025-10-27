@@ -47,7 +47,7 @@ use windows_sys::Win32::Security::WinTrust::WTD_REVOCATION_CHECK_END_CERT;
 use crate::error::{Error, Result, SecurityError};
 use crate::plugins::interface::PluginManifest;
 use sha2::{Digest, Sha256};
-use tracing::{info, warn};
+use tracing::info;
 
 /// Performs cryptographic signature verification for plugin manifests.
 pub struct SignatureVerifier;
@@ -102,7 +102,9 @@ impl SignatureVerifier {
             ))
         }
     }
+}
 
+// Helper structs and implementations for Linux signature verification
 #[cfg(target_os = "linux")]
 struct LinuxSignatureMetadata {
     signer_fingerprint: String,
@@ -369,6 +371,8 @@ fn load_policy() -> AnyhowResult<&'static StandardPolicy> {
     })
 }
 
+// Platform-specific signature verification methods
+impl SignatureVerifier {
     fn verify_platform_requirements(&self, manifest: &PluginManifest) -> Result<()> {
         #[cfg(target_os = "macos")]
         {
@@ -490,9 +494,9 @@ fn load_policy() -> AnyhowResult<&'static StandardPolicy> {
         let mut error_ref: *mut CFError = std::ptr::null_mut();
         let validity_flags =
             SecCSFlags::ConsiderExpiration | SecCSFlags::CheckTrustedAnchors | SecCSFlags::EnforceRevocationChecks;
+        let static_code_ref: &SecStaticCode = static_code.as_ref();
         let validity_status = unsafe {
-            static_code
-                .as_ref()
+            static_code_ref
                 .check_validity_with_errors(validity_flags, requirement_ref, &mut error_ref)
         };
 

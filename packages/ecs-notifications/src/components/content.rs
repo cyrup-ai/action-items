@@ -1,7 +1,7 @@
 // Rich notification content component with enterprise-grade media and interaction support
 // Based on comprehensive analysis of macOS UserNotifications, Windows Toast, Linux D-Bus patterns
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -989,7 +989,7 @@ fn sanitize_html(html: &str) -> NotificationResult<String> {
         // Add rel="noopener noreferrer" to all links for security
         .link_rel(Some("noopener noreferrer"))
         // Only allow http/https URLs (blocks javascript:, data:, vbscript:)
-        .url_schemes(&["https", "http"])
+        .url_schemes(HashSet::from(["https", "http"]))
         // Clean the HTML (strips all disallowed tags, attributes, and scripts)
         .clean(html)
         .to_string();

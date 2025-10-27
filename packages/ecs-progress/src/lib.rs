@@ -139,13 +139,13 @@ pub mod prelude {
 pub use prelude::*;
 
 // Module declarations
-mod entity;
+pub mod entity;
 mod monitor;
 mod plugin;
 mod progress;
 mod state;
 mod system;
-mod utils;
+pub mod utils;
 
 #[cfg(feature = "assets")]
 mod assets;

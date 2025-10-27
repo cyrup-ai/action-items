@@ -159,18 +159,8 @@ pub fn process_cache_reads_system(
                 ))), false)
             };
             
-            // Update metrics
+            // Emit completion event
             command_queue.push(move |world: &mut World| {
-                let mut metrics = world.resource_mut::<CacheMetrics>();
-                if let Some(stats) = metrics.partition_stats.get_mut(&partition_name_task) {
-                    if hit {
-                        stats.hits += 1;
-                    } else {
-                        stats.misses += 1;
-                    }
-                }
-                
-                // Emit completion event
                 world.send_event(CacheReadCompleted {
                     operation_id,
                     partition: partition_name_task,
@@ -236,7 +226,7 @@ pub fn process_cache_writes_system(
         
         // Get cache partition (clone the Goldylox handle)
         let cache_opt = cache_manager.get_partition(&partition_name).cloned();
-        let value_len = value.len();
+        let _value_len = value.len();
         
         let task_pool = AsyncComputeTaskPool::get();
         let task = task_pool.spawn(async move {
@@ -253,17 +243,8 @@ pub fn process_cache_writes_system(
                 )))
             };
             
-            // Update metrics and emit completion event
+            // Emit completion event
             command_queue.push(move |world: &mut World| {
-                if result.is_ok() {
-                    let mut metrics = world.resource_mut::<CacheMetrics>();
-                    if let Some(stats) = metrics.partition_stats.get_mut(&partition_name_task) {
-                        stats.writes += 1;
-                        stats.total_size += value_len;
-                        stats.entry_count += 1;
-                    }
-                }
-                
                 world.send_event(CacheWriteCompleted {
                     operation_id,
                     partition: partition_name_task,
@@ -345,21 +326,14 @@ pub fn process_cache_invalidations_system(
                     
                     let partition_for_eviction = partition_name_task.clone();
                     let key_for_eviction = key_task.clone();
-                    // Emit eviction event and update metrics
+                    // Emit eviction event
                     command_queue.push(move |world: &mut World| {
                         world.send_event(CacheEvictionOccurred {
-                            partition: partition_for_eviction.clone(),
+                            partition: partition_for_eviction,
                             key: key_for_eviction,
                             reason: EvictionReason::ManualInvalidation,
                             value_size,
                         });
-                        
-                        let mut metrics = world.resource_mut::<CacheMetrics>();
-                        if let Some(stats) = metrics.partition_stats.get_mut(&partition_for_eviction) {
-                            stats.evictions += 1;
-                            stats.total_size = stats.total_size.saturating_sub(value_size);
-                            stats.entry_count = stats.entry_count.saturating_sub(1);
-                        }
                     });
                 }
                 
@@ -450,33 +424,59 @@ pub fn cache_eviction_system(
     }
 }
 
-/// System to update cache metrics
+/// System to collect cache metrics from goldylox partitions
 pub fn cache_metrics_system(
     cache_manager: Res<CacheManager>,
     mut metrics: ResMut<CacheMetrics>,
     time: Res<Time>,
 ) {
-    // Update global stats
+    // Update global uptime
     metrics.global_stats.uptime_seconds += time.delta().as_secs();
 
     let mut total_memory = 0;
     let mut total_entries = 0;
+    let mut total_hits = 0;
+    let mut total_misses = 0;
 
-    // Update per-partition stats
-    for partition_name in cache_manager.partitions.keys() {
-        if !metrics.partition_stats.contains_key(partition_name) {
-            metrics
-                .partition_stats
-                .insert(partition_name.clone(), CachePartitionStats::default());
-        }
-
-        if let Some(stats) = metrics.partition_stats.get_mut(partition_name) {
-            // Note: These counters are maintained from operations
-            total_memory += stats.total_size;
-            total_entries += stats.entry_count;
-        }
+    // Collect metrics from each goldylox partition
+    for (partition_name, goldylox_cache) in cache_manager.partitions.iter() {
+        // Get unified stats from goldylox (atomic, accurate, comprehensive)
+        let unified_stats_ref = goldylox_cache.get_unified_stats();
+        
+        // Compute snapshot of current stats (CRITICAL: use compute_unified_stats, not get_snapshot)
+        let unified_stats = unified_stats_ref.compute_unified_stats();
+        
+        // Convert to CachePartitionStats
+        let partition_stats = CachePartitionStats::from_goldylox_stats(&unified_stats);
+        
+        // Update aggregates
+        total_memory += partition_stats.total_size;
+        total_entries += partition_stats.entry_count;
+        total_hits += partition_stats.hits;
+        total_misses += partition_stats.misses;
+        
+        // Store partition-specific stats
+        metrics.partition_stats.insert(partition_name.clone(), partition_stats);
     }
 
+    // Update global aggregated stats
     metrics.global_stats.total_memory_used = total_memory;
     metrics.global_stats.total_entries = total_entries;
+    
+    // Optional: log summary periodically (every 30 seconds)
+    if metrics.global_stats.uptime_seconds % 30 == 0 {
+        let overall_hit_rate = if total_hits + total_misses > 0 {
+            total_hits as f64 / (total_hits + total_misses) as f64
+        } else {
+            0.0
+        };
+        
+        debug!(
+            "Cache metrics: partitions={}, hit_rate={:.2}%, memory={}KB, entries={}",
+            cache_manager.partitions.len(),
+            overall_hit_rate * 100.0,
+            total_memory / 1024,
+            total_entries,
+        );
+    }
 }

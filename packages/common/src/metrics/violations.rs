@@ -559,6 +559,15 @@ impl ViolationDetector {
     }
 
     /// Get current value for a specific metric from the metrics system
+    ///
+    /// Supports multiple metric types:
+    /// - Memory metrics: `memory_current_usage`, `memory_peak_usage`, `memory_efficiency`
+    /// - Latency metrics: `latency_average_us`, `latency_max_us`, `latency_min_us`, `latency_pXX_us`
+    /// - Counter metrics: `counter_<name>` (prefixed) or any registered counter name
+    /// - Dashboard gauges: `memory_usage_mb`, `memory_efficiency`, `average_latency_ms`, `health_score`
+    /// - Custom metrics: Any counter registered via `counters().register_counter(name)`
+    ///
+    /// Returns `Some(value)` if metric exists, `None` if not found in any system.
     fn get_current_metric_value(
         &self,
         metric_name: &str,
@@ -622,13 +631,23 @@ impl ViolationDetector {
                 }
             },
 
-            // Default case - try to find in dashboard if available
+            // Default case - query dashboard for registered counters and gauges
             _ => {
-                // Intentional: Unknown metrics return None to maintain type safety.
-                // Registered sources: jemalloc (memory), app (UI perf), fetch (network).
-                // Dynamic discovery deferred to plugin system (see core/src/plugins/mod.rs).
-                // This prevents runtime errors from unknown metric types.
-                // If needed, register new sources in MetricsRegistry::new() rather than dynamic lookup.
+                // Query dashboard snapshot for registered counters and gauges
+                let snapshot = metrics_system.dashboard().current_snapshot();
+                
+                // First, check if this is a registered counter (u64 -> f64 conversion)
+                if let Some(&counter_value) = snapshot.counters.get(metric_name) {
+                    return Some(counter_value as f64);
+                }
+                
+                // Then, check if this is a dashboard gauge (already f64)
+                // Note: Only contains manually inserted gauges (memory_usage_mb, etc.)
+                if let Some(&gauge_value) = snapshot.gauges.get(metric_name) {
+                    return Some(gauge_value);
+                }
+                
+                // Metric not found in any system (memory, latency, counter, gauge)
                 None
             },
         }

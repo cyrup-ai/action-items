@@ -2,469 +2,518 @@
 
 ## EXECUTIVE SUMMARY
 
-This task identifies and separates test stubs/mocks from production code using Rust's conditional compilation attributes (`#[cfg(test)]` and `#[cfg(not(test))]`). The goal is to ensure production builds (`cargo build --release`) exclude test-only code, reducing binary size and preventing accidental inclusion of mock implementations.
+This task separates test stubs/mocks from production code using Rust's conditional compilation attributes (`#[cfg(test)]` and `#[cfg(not(test))]`). The goal is to ensure production builds (`cargo build --release`) exclude test-only code, reducing binary size and preventing accidental inclusion of mock implementations.
 
-**Status**: Research complete. Two primary issues identified requiring immediate attention.
+**Status**: 50% Complete - Issue #1 RESOLVED, Issue #2 PENDING
 
-**Impact**: Medium-High. Affects binary size, code clarity, and ensures production builds don't include test infrastructure.
+**Impact**: Medium. Affects binary size, code clarity, and ensures production builds don't include test infrastructure.
 
 ---
 
-## ACTUAL FINDINGS FROM CODEBASE RESEARCH
+## CURRENT STATUS (Updated 2025-10-27)
 
-### ✅ ALREADY CORRECT (No Action Needed)
+### ✅ COMPLETED
 
-1. **Test modules properly isolated**: Most test code already uses `#[cfg(test)]`
-   - `packages/ecs-user-settings/src/lib.rs:68-69` - `#[cfg(test)] mod tests;`
-   - `packages/core/src/plugins/service_bridge_integration/permission_mapper.rs` - test helpers in `#[cfg(test)]` module
+**Issue #1: Mock WASM Runtime in processor.rs - RESOLVED**
 
-2. **Platform stubs are intentional**: Icon extraction stubs in `packages/ecs-ui/src/icons/extraction/platform.rs` are **graceful fallbacks**, not test code
-   - Functions return `None` to trigger fallback to FontAwesome icons
-   - This is correct production behavior for unimplemented platforms
+**File**: `packages/core/src/plugins/bridge/handlers/processor.rs`
 
-3. **Feature-gated code**: Already uses conditional compilation properly
-   - `#[cfg(feature = "jemalloc-profiling")]`
-   - `#[cfg(feature = "dhat-heap")]`
+**What was done**:
+- Removed entire mock `WasmRuntime` struct (previously lines 19-73)
+- Removed mock `get_wasm_runtime()` function
+- Replaced with proper event-driven architecture documentation
+- ServiceRequest::WasmCallback now returns immediate acknowledgment
+- Actual WASM execution happens via ECS event system (WasmCallbackEvent)
+- Added comprehensive architecture documentation explaining the event flow
 
-### ❌ REQUIRES FIXING
+**Result**: Production code no longer contains mock WASM implementations. The system now properly uses:
+- `WasmCallbackHandler` (packages/core/src/plugins/ecs_queries/wasm_callback_handler.rs)
+- `ExtismPluginAdapter` for actual WASM execution
+- Bevy ECS event system for asynchronous processing
 
-#### Issue 1: Mock WASM Runtime in Production Code
+See [`packages/core/src/plugins/bridge/handlers/processor.rs:1-71`](../packages/core/src/plugins/bridge/handlers/processor.rs) for current implementation.
 
-**File**: [`packages/core/src/plugins/bridge/handlers/processor.rs`](../packages/core/src/plugins/bridge/handlers/processor.rs)
+---
 
-**Problem**: Lines 19-73 contain a mock `WasmRuntime` struct used in production code (called at line 228)
+### ❌ PENDING
 
-**Current Code**:
+**Issue #2: Test Infrastructure Unconditionally Compiled**
+
+**File**: `packages/common/src/metrics/memory/mod.rs`
+
+**Problem**: Testing module (557 lines) is unconditionally compiled into production binaries
+
+**Current Code** (lines 89-107):
 ```rust
-/// Mock WASM runtime for processing plugin callbacks
-/// In a full implementation, this would integrate with the actual WASM execution environment
-struct WasmRuntime {
-    plugin_id: String,
-}
+// Line 89 - Automated testing framework
+pub mod testing;
 
-impl WasmRuntime {
-    async fn call_function(&self, function_name: &str, data: Vec<u8>) -> Result<Vec<u8>, String> {
-        // Mock implementation that echoes data
-        match function_name {
-            "process_data" => Ok(data),
-            "validate_input" => Ok(vec![if !data.is_empty() { 1 } else { 0 }]),
-            "transform_data" => Ok(data),
-            _ => Err(format!("Unknown WASM function: {}", function_name)),
-        }
-    }
-}
-
-async fn get_wasm_runtime(plugin_id: &str) -> Option<WasmRuntime> {
-    // Returns mock for any non-empty plugin_id
-    if !plugin_id.is_empty() {
-        Some(WasmRuntime {
-            plugin_id: plugin_id.to_string(),
-        })
-    } else {
-        None
-    }
-}
-```
-
-**Real Infrastructure Available**: [`packages/core/src/plugins/ecs_queries/wasm_callback_handler.rs`](../packages/core/src/plugins/ecs_queries/wasm_callback_handler.rs)
-- Production-ready `WasmCallbackHandler` with ECS integration
-- Supports Extism, native plugins, and Raycast/Deno runtime
-- Already handles plugin lookup and function invocation
-
-#### Issue 2: Test Infrastructure Unconditionally Compiled
-
-**File**: [`packages/common/src/metrics/memory/mod.rs`](../packages/common/src/metrics/memory/mod.rs)
-
-**Problem**: Line 90 unconditionally includes test infrastructure module
-
-**Current Code**:
-```rust
-pub mod testing;  // Line 90 - always compiled
+// Lines 95-107 - Re-exports
+pub use testing::{
+    LeakTestScenario, MemoryLeakTestSuite, MemoryThresholds, TestCategory, TestMemoryStats,
+    TestMemoryUsage, TestResult, TestResults, TestStatus, scenarios,
+};
 ```
 
 **Impact**: 
-- `testing.rs` (557 lines) includes `MemoryLeakTestSuite`, test scenarios, and test helpers
-- Compiled into production binaries unnecessarily
-- Increases binary size ~20-30KB
+- `testing.rs` (557 lines) compiled into all builds
+- Includes `MemoryLeakTestSuite`, test scenarios, and test helpers
+- Estimated binary size impact: 20-30KB
+- Used by `MemoryMonitoringSystem` struct (line 117)
 
 ---
 
-## IMPLEMENTATION PATTERNS
+## IMPLEMENTATION GUIDE
 
-### Pattern 1: Conditional Module Declaration
+### STEP 1: Conditional Compilation for Testing Module
 
-Use for test infrastructure that should only be available during testing:
+**File**: `packages/common/src/metrics/memory/mod.rs`
 
+#### Change 1: Module Declaration (Line 90)
+
+**Current**:
 ```rust
-// Production: module not compiled at all
-#[cfg(test)]
+// Automated testing framework
 pub mod testing;
+```
 
-// Alternative: Available for integration tests via feature flag
+**Replace with**:
+```rust
+// Automated testing framework
+// Available in tests and via test-utils feature for integration testing
 #[cfg(any(test, feature = "test-utils"))]
 pub mod testing;
 ```
 
-**Use when**: Entire module is test infrastructure (test harnesses, mock factories, test scenarios)
+#### Change 2: Re-exports (Lines 105-107)
 
-### Pattern 2: Separate Production and Test Implementations
-
-Use when function/struct needs different implementations for prod vs test:
-
+**Current**:
 ```rust
-// Production implementation
-#[cfg(not(test))]
-fn get_service() -> Box<dyn Service> {
-    Box::new(RealService::new())
-}
+pub use testing::{
+    LeakTestScenario, MemoryLeakTestSuite, MemoryThresholds, TestCategory, TestMemoryStats,
+    TestMemoryUsage, TestResult, TestResults, TestStatus, scenarios,
+};
+```
 
-// Test implementation
-#[cfg(test)]
-fn get_service() -> Box<dyn Service> {
-    Box::new(MockService::new())
+**Replace with**:
+```rust
+#[cfg(any(test, feature = "test-utils"))]
+pub use testing::{
+    LeakTestScenario, MemoryLeakTestSuite, MemoryThresholds, TestCategory, TestMemoryStats,
+    TestMemoryUsage, TestResult, TestResults, TestStatus, scenarios,
+};
+```
+
+#### Change 3: MemoryMonitoringSystem Field (Line 125)
+
+**Current**:
+```rust
+pub struct MemoryMonitoringSystem {
+    enhanced_tracker: Arc<EnhancedMemoryTracker>,
+    #[cfg(feature = "jemalloc-profiling")]
+    jemalloc_profiler: Option<JemallocProfiler>,
+    #[cfg(feature = "dhat-heap")]
+    dhat_profiler: Option<DhatProfiler>,
+    leak_test_suite: MemoryLeakTestSuite,  // Line 125 - unconditional
 }
 ```
 
-**Use when**: Same API, different behavior for testing
-
-### Pattern 3: Conditional Logic Within Function
-
-Use for small conditional branches within a function:
-
+**Replace with**:
 ```rust
-fn process_data(data: &[u8]) -> Result<Vec<u8>> {
-    #[cfg(test)]
-    {
-        // Simplified test path
-        return Ok(data.to_vec());
+pub struct MemoryMonitoringSystem {
+    enhanced_tracker: Arc<EnhancedMemoryTracker>,
+    #[cfg(feature = "jemalloc-profiling")]
+    jemalloc_profiler: Option<JemallocProfiler>,
+    #[cfg(feature = "dhat-heap")]
+    dhat_profiler: Option<DhatProfiler>,
+    #[cfg(any(test, feature = "test-utils"))]
+    leak_test_suite: MemoryLeakTestSuite,
+}
+```
+
+#### Change 4: Constructor - new() Method (Lines 129-165)
+
+Locate the section that initializes `leak_test_suite`:
+
+**Current** (around lines 156-162):
+```rust
+let mut leak_test_suite = MemoryLeakTestSuite::new();
+leak_test_suite
+    .initialize_tracking()
+    .map_err(|e| MemorySystemError::TestingError(e.to_string()))?;
+
+info!("Memory monitoring system initialized with all available layers");
+
+Ok(Self {
+    enhanced_tracker,
+
+    #[cfg(feature = "jemalloc-profiling")]
+    jemalloc_profiler,
+
+    #[cfg(feature = "dhat-heap")]
+    dhat_profiler,
+
+    leak_test_suite,
+})
+```
+
+**Replace with**:
+```rust
+#[cfg(any(test, feature = "test-utils"))]
+let mut leak_test_suite = MemoryLeakTestSuite::new();
+
+#[cfg(any(test, feature = "test-utils"))]
+leak_test_suite
+    .initialize_tracking()
+    .map_err(|e| MemorySystemError::TestingError(e.to_string()))?;
+
+info!("Memory monitoring system initialized with all available layers");
+
+Ok(Self {
+    enhanced_tracker,
+
+    #[cfg(feature = "jemalloc-profiling")]
+    jemalloc_profiler,
+
+    #[cfg(feature = "dhat-heap")]
+    dhat_profiler,
+
+    #[cfg(any(test, feature = "test-utils"))]
+    leak_test_suite,
+})
+```
+
+#### Change 5: Fallback Constructor - new_fallback() Method (Lines 167-183)
+
+**Current** (around lines 167-183):
+```rust
+fn new_fallback() -> Self {
+    let base_tracker = Arc::new(MemoryTracker::new());
+    let enhanced_tracker = Arc::new(EnhancedMemoryTracker::new(base_tracker));
+    let leak_test_suite = MemoryLeakTestSuite::new(); // Don't initialize tracking in fallback
+
+    Self {
+        enhanced_tracker,
+
+        #[cfg(feature = "jemalloc-profiling")]
+        jemalloc_profiler: None,
+
+        #[cfg(feature = "dhat-heap")]
+        dhat_profiler: None,
+
+        leak_test_suite,
     }
+}
+```
+
+**Replace with**:
+```rust
+fn new_fallback() -> Self {
+    let base_tracker = Arc::new(MemoryTracker::new());
+    let enhanced_tracker = Arc::new(EnhancedMemoryTracker::new(base_tracker));
     
-    #[cfg(not(test))]
-    {
-        // Full production logic
-        expensive_processing(data)
+    #[cfg(any(test, feature = "test-utils"))]
+    let leak_test_suite = MemoryLeakTestSuite::new(); // Don't initialize tracking in fallback
+
+    Self {
+        enhanced_tracker,
+
+        #[cfg(feature = "jemalloc-profiling")]
+        jemalloc_profiler: None,
+
+        #[cfg(feature = "dhat-heap")]
+        dhat_profiler: None,
+
+        #[cfg(any(test, feature = "test-utils"))]
+        leak_test_suite,
     }
 }
 ```
 
-**Use when**: Minor test shortcuts within otherwise production code
+#### Change 6: run_comprehensive_tests() Method (Lines 259-283)
+
+Add conditional compilation attribute to entire method:
+
+**Current**:
+```rust
+/// Run comprehensive memory leak tests
+pub async fn run_comprehensive_tests(&mut self) -> Result<TestResults, MemorySystemError> {
+    info!("Running comprehensive memory leak tests");
+    
+    // ... method body ...
+}
+```
+
+**Replace with**:
+```rust
+/// Run comprehensive memory leak tests
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn run_comprehensive_tests(&mut self) -> Result<TestResults, MemorySystemError> {
+    info!("Running comprehensive memory leak tests");
+    
+    // ... method body ...
+}
+```
+
+#### Change 7: test_suite_mut() Method (Lines 290-292)
+
+Add conditional compilation attribute:
+
+**Current**:
+```rust
+/// Get test suite for custom testing
+pub fn test_suite_mut(&mut self) -> &mut MemoryLeakTestSuite {
+    &mut self.leak_test_suite
+}
+```
+
+**Replace with**:
+```rust
+/// Get test suite for custom testing
+#[cfg(any(test, feature = "test-utils"))]
+pub fn test_suite_mut(&mut self) -> &mut MemoryLeakTestSuite {
+    &mut self.leak_test_suite
+}
+```
 
 ---
 
-## STEP-BY-STEP EXECUTION PLAN
+## IMPLEMENTATION PATTERNS (Reference)
 
-### STEP 1: Fix Mock WASM Runtime in processor.rs
+### Pattern 1: Conditional Module Declaration
+Use when entire module is test infrastructure:
 
-**File**: `packages/core/src/plugins/bridge/handlers/processor.rs`
-
-**Actions**:
-
-1. **Import the real WASM infrastructure**:
-   ```rust
-   use crate::plugins::ecs_queries::wasm_callback_handler::WasmCallbackHandler;
-   ```
-
-2. **Remove mock implementations** (lines 19-73):
-   - Delete `struct WasmRuntime`
-   - Delete `impl WasmRuntime`
-   - Delete `async fn get_wasm_runtime()`
-
-3. **Integrate WasmCallbackHandler** in the `ServiceRequest::WasmCallback` handler (around line 226):
-
-   **Before**:
-   ```rust
-   match get_wasm_runtime(&plugin_id).await {
-       Some(runtime) => {
-           match runtime.call_function(&function_name, data).await {
-               Ok(result_data) => { /* ... */ },
-               Err(e) => { /* ... */ }
-           }
-       },
-       None => Err(format!("Plugin {} not found", plugin_id))
-   }
-   ```
-
-   **After**:
-   ```rust
-   // Use the real ECS-based WASM callback handler
-   // Note: This requires access to the ECS World - consider refactoring 
-   // to make process_service_request a system or system param
-   
-   // For now, document that WasmCallback requires ECS integration:
-   log::warn!(
-       "WasmCallback for plugin {} requires ECS integration - use WasmCallbackHandler system",
-       plugin_id
-   );
-   
-   // Return error indicating need for proper ECS integration
-   ServiceResponse::WasmCallback(Err(format!(
-       "WasmCallback requires ECS integration via WasmCallbackHandler system. Plugin: {}",
-       plugin_id
-   )))
-   ```
-
-4. **Add TODO comment** for proper integration:
-   ```rust
-   // TODO: Refactor to use WasmCallbackHandler with ECS World access
-   // See packages/core/src/plugins/ecs_queries/wasm_callback_handler.rs
-   // This handler needs to be called from a Bevy system with access to:
-   // - Query<(Entity, &PluginComponent)>
-   // - Query<(Entity, &ExtismPluginComponent)>
-   // - Query<(Entity, &RaycastPluginComponent)>
-   ```
-
-**Alternative Approach** (if ECS access is available):
 ```rust
-// If process_service_request can be converted to a Bevy system:
-pub fn process_service_request_system(
-    request: ServiceRequest,
-    wasm_handler: WasmCallbackHandler,
-) -> ServiceResponse {
-    // ...
-    ServiceRequest::WasmCallback { plugin_id, function_name, data } => {
-        let payload = serde_json::Value::String(
-            String::from_utf8_lossy(&data).to_string()
-        );
-        
-        match wasm_handler.call_wasm_plugin_function_ecs(
-            &plugin_id,
-            &function_name,
-            &payload
-        ) {
-            Ok(result) => ServiceResponse::WasmCallback(Ok(result.into_bytes())),
-            Err(e) => ServiceResponse::WasmCallback(Err(e))
-        }
-    }
+#[cfg(any(test, feature = "test-utils"))]
+pub mod testing;
+```
+
+### Pattern 2: Conditional Struct Fields
+Use when struct contains test-only data:
+
+```rust
+pub struct MyStruct {
+    production_field: String,
+    
+    #[cfg(any(test, feature = "test-utils"))]
+    test_suite: TestSuite,
 }
 ```
 
-### STEP 2: Fix Testing Module Declaration
+### Pattern 3: Conditional Method Implementation
+Use when methods are only for testing:
 
-**File**: `packages/common/src/metrics/memory/mod.rs`
-
-**Actions**:
-
-1. **Change line 90** from unconditional to conditional:
-
-   **Before**:
-   ```rust
-   pub mod testing;
-   ```
-
-   **After** (Option A - Test-only):
-   ```rust
-   #[cfg(test)]
-   pub mod testing;
-   ```
-
-   **After** (Option B - Test + Feature Flag):
-   ```rust
-   /// Test infrastructure for memory leak detection
-   /// Available in tests or with `test-utils` feature
-   #[cfg(any(test, feature = "test-utils"))]
-   pub mod testing;
-   ```
-
-2. **Update re-exports** (around line 98-102) to be conditional:
-
-   **Before**:
-   ```rust
-   pub use testing::{
-       LeakTestScenario, MemoryLeakTestSuite, MemoryThresholds, TestCategory, 
-       TestMemoryStats, TestMemoryUsage, TestResult, TestResults, TestStatus, scenarios,
-   };
-   ```
-
-   **After**:
-   ```rust
-   #[cfg(any(test, feature = "test-utils"))]
-   pub use testing::{
-       LeakTestScenario, MemoryLeakTestSuite, MemoryThresholds, TestCategory, 
-       TestMemoryStats, TestMemoryUsage, TestResult, TestResults, TestStatus, scenarios,
-   };
-   ```
-
-3. **Update usages** in `MemoryMonitoringSystem` (lines 133-143):
-
-   **Before**:
-   ```rust
-   leak_test_suite: MemoryLeakTestSuite,  // Unconditional field
-   ```
-
-   **After**:
-   ```rust
-   #[cfg(any(test, feature = "test-utils"))]
-   leak_test_suite: MemoryLeakTestSuite,
-   ```
-
-4. **Update methods** that use the test suite:
-   - `new()` method (line 123): Conditionally initialize
-   - `new_fallback()` method (line 173): Conditionally include
-   - `run_comprehensive_tests()` method (line 263): Add `#[cfg(any(test, feature = "test-utils"))]`
-
-**Recommendation**: Use **Option B** (feature flag) if integration tests need access to test infrastructure. Otherwise use **Option A** (test-only).
-
-### STEP 3: Verify No False Positives
-
-**Files that DO NOT need changes** (verified as correct):
-
-1. `packages/ecs-ui/src/icons/extraction/platform.rs`
-   - Stubs are intentional fallbacks (return `None` → triggers FontAwesome icons)
-   - This is correct production behavior
-
-2. `packages/core/src/plugins/service_bridge_integration/permission_mapper.rs`
-   - Mock helpers already in `#[cfg(test)]` module (lines 248-442)
-
-3. `packages/common/src/metrics/memory/dhat_profiler.rs`
-   - Already feature-gated: `#[cfg(feature = "dhat-heap")]`
-
-4. `packages/core/src/runtime/deno/notifications/macos.rs`
-   - Comments say "stub" but code is production-ready (lines 44-145)
-   - No changes needed
-
-### STEP 4: Verify Builds
-
-After making changes:
-
-```bash
-# Verify production build excludes test code
-cargo build --release --workspace
-
-# Verify test build includes test infrastructure
-cargo test --workspace --all-features
-
-# Check binary size impact
-ls -lh target/release/action-items  # Before
-# Make changes
-ls -lh target/release/action-items  # After - should be slightly smaller
+```rust
+#[cfg(any(test, feature = "test-utils"))]
+pub fn run_tests(&mut self) -> TestResults {
+    // test code
+}
 ```
+
+---
+
+## VERIFICATION STEPS
+
+After making changes to `mod.rs`:
+
+### 1. Verify Production Build
+```bash
+cargo build --release --workspace
+```
+Expected: Succeeds without errors
+
+### 2. Verify Test Build
+```bash
+cargo test --workspace --all-features
+```
+Expected: All tests pass, test infrastructure available
+
+### 3. Verify with test-utils Feature
+```bash
+cargo build --features test-utils
+```
+Expected: Test infrastructure compiled when feature enabled
+
+### 4. Check Binary Size (Optional)
+```bash
+# Before changes
+cargo clean
+cargo build --release
+ls -lh target/release/action_items
+
+# After changes
+cargo clean
+cargo build --release
+ls -lh target/release/action_items
+```
+Expected: Binary slightly smaller (20-30KB reduction)
 
 ---
 
 ## DEFINITION OF DONE
 
-- [x] Research complete - specific files identified
-- [ ] `processor.rs`: Mock `WasmRuntime` removed or properly gated
-- [ ] `processor.rs`: Integration with real `WasmCallbackHandler` documented/implemented
-- [ ] `mod.rs`: `testing` module declaration conditionally compiled
-- [ ] `mod.rs`: `testing` re-exports conditionally compiled
-- [ ] `mod.rs`: `MemoryMonitoringSystem` conditionally includes test suite
+- [x] **Issue #1**: Mock WASM runtime removed from processor.rs (COMPLETED)
+- [ ] **Issue #2**: Testing module conditionally compiled in mod.rs
+  - [ ] Line 90: Module declaration has `#[cfg(any(test, feature = "test-utils"))]`
+  - [ ] Lines 105-107: Re-exports conditionally compiled
+  - [ ] Line 125: `leak_test_suite` field conditionally included
+  - [ ] Lines 156-162: Constructor conditionally initializes test suite
+  - [ ] Lines 167-183: Fallback constructor conditionally includes field
+  - [ ] Lines 259-283: `run_comprehensive_tests()` conditionally compiled
+  - [ ] Lines 290-292: `test_suite_mut()` conditionally compiled
 - [ ] Verified: `cargo build --release --workspace` succeeds
 - [ ] Verified: `cargo test --workspace --all-features` succeeds
-- [ ] Verified: No "for testing" or "test only" comments in unconditional production code
-- [ ] Verified: Binary size reduced (optional - measure with `ls -lh target/release/action-items`)
+- [ ] Verified: No compilation errors in production or test builds
 
 ---
 
-## CONSTRAINTS
+## FILES TO MODIFY
 
-- ✅ DO NOT write new tests
-- ✅ DO NOT write benchmarks  
-- ✅ DO NOT write extensive documentation
-- ✅ DO NOT break existing test functionality
-- ✅ DO NOT break existing production functionality
-- ✅ DO ensure production builds exclude all test code
-- ✅ DO use existing codebase patterns (feature flags, conditional compilation)
+### Primary
+- [`packages/common/src/metrics/memory/mod.rs`](../packages/common/src/metrics/memory/mod.rs) - Add conditional compilation (7 changes)
 
----
-
-## REFERENCES
-
-### Codebase References
-
-- Mock WASM Runtime: [`packages/core/src/plugins/bridge/handlers/processor.rs`](../packages/core/src/plugins/bridge/handlers/processor.rs)
-- Real WASM Handler: [`packages/core/src/plugins/ecs_queries/wasm_callback_handler.rs`](../packages/core/src/plugins/ecs_queries/wasm_callback_handler.rs)
-- Testing Module: [`packages/common/src/metrics/memory/testing.rs`](../packages/common/src/metrics/memory/testing.rs)
-- Module Declaration: [`packages/common/src/metrics/memory/mod.rs`](../packages/common/src/metrics/memory/mod.rs)
-- Extism Integration: [`packages/plugin-wasm/src/extism.rs`](../packages/plugin-wasm/src/extism.rs)
-
-### Existing Conditional Compilation Examples in Codebase
-
-- Feature-gated modules: `packages/common/src/metrics/memory/mod.rs:84-89`
-  ```rust
-  #[cfg(feature = "jemalloc-profiling")]
-  pub mod jemalloc_profiler;
-  
-  #[cfg(feature = "dhat-heap")]
-  pub mod dhat_profiler;
-  ```
-
-- Test module gating: `packages/ecs-user-settings/src/lib.rs:68-69`
-  ```rust
-  #[cfg(test)]
-  mod tests;
-  ```
-
-### Rust Documentation
-
-- Conditional Compilation: https://doc.rust-lang.org/reference/conditional-compilation.html
-- Cfg Attribute: https://doc.rust-lang.org/rust-by-example/attribute/cfg.html
+### Reference (Already Correct)
+- [`packages/core/src/plugins/bridge/handlers/processor.rs`](../packages/core/src/plugins/bridge/handlers/processor.rs) - Already fixed
+- [`packages/core/src/plugins/ecs_queries/wasm_callback_handler.rs`](../packages/core/src/plugins/ecs_queries/wasm_callback_handler.rs) - Real WASM handler
+- [`packages/common/src/metrics/memory/testing.rs`](../packages/common/src/metrics/memory/testing.rs) - Test infrastructure module
 
 ---
 
 ## TECHNICAL NOTES
 
-### Why processor.rs Mock is Problematic
+### Why Use `any(test, feature = "test-utils")`?
 
-The mock `WasmRuntime` in processor.rs:
-1. **Always returns mock data** - echoes input or returns hardcoded values
-2. **No real plugin lookup** - accepts any non-empty plugin_id
-3. **Included in production** - called from production code path (line 228)
-4. **Real infrastructure exists** - `WasmCallbackHandler` provides full implementation
+Two use cases for test infrastructure:
+1. **Unit/integration tests** (`cfg(test)`): Built-in Rust test compilation
+2. **Custom test harnesses** (`feature = "test-utils"`): External test binaries/benchmarks
 
-This is different from platform.rs stubs which:
-- Return `None` (failure) intentionally
-- Trigger graceful fallback to generic icons
-- Are correct production behavior for unimplemented platforms
+Using `any(test, feature = "test-utils")` supports both:
+- Regular tests: `cargo test`
+- Feature-enabled: `cargo build --features test-utils`
+- Production: Excluded by default
 
-### Testing Module Impact
+### What About Test Helper Functions?
 
-The `testing.rs` module (557 lines):
-- Provides `MemoryLeakTestSuite` for CI/CD integration
-- Includes test scenarios, thresholds, and result tracking
-- Not needed in production binaries
-- Estimated impact: 20-30KB in binary size
+Functions like `DatabaseService::new_in_memory()` are **intentionally public** test utilities:
+- They're APIs for test code to call
+- NOT mock implementations used in production paths
+- Similar to standard test helpers in Rust ecosystem
+- These do NOT need `#[cfg(test)]` gating
 
-### Integration Considerations
+Example of correct test helper (no changes needed):
+```rust
+// packages/ecs-surrealdb/src/service.rs:44-49
+/// Create in-memory database for testing
+pub async fn new_in_memory() -> Result<Self, DatabaseError> {
+    let config = DatabaseConfig {
+        namespace: "test".to_string(),
+        database: "test".to_string(),
+        engine: DatabaseEngine::Mem,
+    };
+    Self::new(config).await
+}
+```
 
-The `WasmCallbackHandler` requires ECS World access. The refactoring options:
+This is fine because:
+- Returns real implementation (not mock data)
+- Uses in-memory engine (valid production config)
+- Doesn't echo fake data like the old processor.rs mock did
 
-1. **Option A**: Make `process_service_request` a Bevy system
-   - Pro: Direct access to ECS queries
-   - Con: Larger refactoring effort
+### Binary Size Impact
 
-2. **Option B**: Pass `WasmCallbackHandler` as parameter
-   - Pro: Minimal changes
-   - Con: Requires threading handler through call chain
+The `testing.rs` module includes:
+- 557 lines of test infrastructure
+- Test scenario definitions
+- Memory threshold configurations
+- Result tracking and reporting
+- Estimated: 20-30KB in compiled binary
 
-3. **Option C**: Return error, handle WasmCallback at higher level
-   - Pro: No changes to processor.rs architecture
-   - Con: Requires caller to handle WasmCallback specially
-
-**Recommended**: Option C (interim) → Option A (future refactor)
+Not huge, but unnecessary overhead for production builds.
 
 ---
 
-## SEARCH COMMANDS USED
+## EXISTING PATTERNS IN CODEBASE
 
-Research commands that identified these issues:
+### Feature-Gated Modules (Already Correct)
+```rust
+// packages/common/src/metrics/memory/mod.rs:84-89
+#[cfg(feature = "jemalloc-profiling")]
+pub mod jemalloc_profiler;
+
+#[cfg(feature = "dhat-heap")]
+pub mod dhat_profiler;
+```
+
+### Test Module Gating (Already Correct)
+```rust
+// packages/ecs-user-settings/src/lib.rs:68-69
+#[cfg(test)]
+mod tests;
+```
+
+Follow these existing patterns when adding conditional compilation to `testing` module.
+
+---
+
+## CONSTRAINTS
+
+- ✅ DO NOT write tests for this change
+- ✅ DO NOT write benchmarks
+- ✅ DO NOT write extensive documentation beyond code comments
+- ✅ DO ensure production builds exclude all test code
+- ✅ DO ensure test builds include test infrastructure
+- ✅ DO NOT break existing test functionality
+- ✅ DO NOT break existing production functionality
+- ✅ DO use existing codebase patterns (feature flags, conditional compilation)
+
+---
+
+## SEARCH COMMANDS USED IN RESEARCH
 
 ```bash
-# Find mock/stub patterns
-rg "mock|Mock|stub|Stub|fake|Fake" --type rust packages/*/src/ -n
+# Find mock/stub patterns in source code
+rg "mock|Mock|stub|Stub" --type rust packages/*/src/ -n
 
-# Find test-only comments  
+# Find test-only comments in source code
 rg "for testing|test only|test purposes" --type rust packages/*/src/ -n
 
-# Find existing conditional compilation
+# Find existing conditional compilation examples
 rg "#\[cfg\(test\)\]|#\[cfg\(not\(test\)\)\]" --type rust packages/*/src/ -n
 
 # Find WASM-related code
 rg "WasmRuntime|get_wasm_runtime" --type rust packages/*/src/ -n
+
+# Verify testing module usage
+rg "MemoryLeakTestSuite|leak_test_suite" --type rust packages/common/src/ -n
 ```
 
 ---
 
-**Last Updated**: 2025-10-10  
-**Research Status**: Complete  
-**Ready for Implementation**: Yes
+## IMPLEMENTATION CHECKLIST
+
+Use this checklist when implementing the changes:
+
+```markdown
+### packages/common/src/metrics/memory/mod.rs
+
+- [ ] Line 90: Add `#[cfg(any(test, feature = "test-utils"))]` before `pub mod testing;`
+- [ ] Lines 105-107: Add `#[cfg(any(test, feature = "test-utils"))]` before testing re-exports
+- [ ] Line 125: Add `#[cfg(any(test, feature = "test-utils"))]` before `leak_test_suite` field
+- [ ] Lines 156-162: Wrap test suite initialization in `#[cfg(any(test, feature = "test-utils"))]`
+- [ ] Lines 167-183: Wrap test suite initialization in `#[cfg(any(test, feature = "test-utils"))]`
+- [ ] Line 259: Add `#[cfg(any(test, feature = "test-utils"))]` to `run_comprehensive_tests()` method
+- [ ] Line 290: Add `#[cfg(any(test, feature = "test-utils"))]` to `test_suite_mut()` method
+
+### Verification
+- [ ] Run `cargo build --release --workspace`
+- [ ] Run `cargo test --workspace --all-features`
+- [ ] Run `cargo build --features test-utils` (optional - if feature exists)
+- [ ] Verify no warnings about unused code
+- [ ] Verify tests still pass
+```
+
+---
+
+**Last Updated**: 2025-10-27  
+**Implementation Status**: 50% Complete (1 of 2 issues resolved)  
+**Ready for Implementation**: Yes - Proceed with mod.rs changes
