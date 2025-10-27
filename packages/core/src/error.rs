@@ -31,7 +31,7 @@ pub enum Error {
     SecurityVerification(SecurityError),
 
     // Additional error variants needed by the codebase
-    /// Configuration-related errors (direct variant for backward compatibility)
+    /// Configuration-related errors
     ConfigurationError(String),
     /// System-level operation errors
     SystemError(String),
@@ -49,7 +49,7 @@ pub enum Error {
     SerializationError(String),
     /// Plugin not found errors
     PluginNotFound(String),
-    /// Plugin-related errors (direct variant for backward compatibility)
+    /// Plugin-related errors
     PluginError(String),
 }
 

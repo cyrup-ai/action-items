@@ -330,8 +330,16 @@ impl WizardNavigationRequest {
         match action {
             WizardAction::Next => Self::next(),
             WizardAction::Back => Self::back(),
-            WizardAction::Skip => Self::back(), // For now, treat skip as back
-            WizardAction::Cancel => Self::back(), // For now, treat cancel as back
+            WizardAction::Skip => {
+                // Skip to completion. Note: UI layer actually sends WizardCancelRequest
+                // directly instead of using this method. This is here for API completeness.
+                Self::skip_to(WizardState::Complete)
+            }
+            WizardAction::Cancel => {
+                // Cancel should use WizardCancelRequest event instead.
+                // This fallback treats it as back navigation for safety.
+                Self::back()
+            }
         }
     }
     

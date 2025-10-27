@@ -266,6 +266,8 @@ pub struct ChunkMetadata {
     pub hash: Option<u64>,
     /// Chunk encoding
     pub encoding: Option<String>,
+    /// Track if decompression was applied
+    pub decompressed: bool,
 }
 
 /// Stream receiver for consuming chunks
@@ -381,6 +383,13 @@ impl StreamHandler {
             mut paused,
         } = self;
 
+        // Extract encoding from response headers
+        let encoding = response
+            .headers()
+            .get("content-encoding")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
         let mut stream = response.bytes_stream();
         let mut current_chunk_size = config.chunk_size;
         let mut chunk_buffer = BytesMut::new();
@@ -414,7 +423,7 @@ impl StreamHandler {
                             // Process any buffered data with new chunk size if buffer exceeds new size
                             if chunk_buffer.len() >= current_chunk_size {
                                 let chunk_data = chunk_buffer.split_to(current_chunk_size).freeze();
-                                if let Err(e) = Self::process_chunk_data(&chunk_sender, &operation_id, &correlation_id, &mut sequence, chunk_data).await {
+                                if let Err(e) = Self::process_chunk_data(&chunk_sender, &operation_id, &correlation_id, &mut sequence, chunk_data, encoding.as_deref()).await {
                                     let _ = chunk_sender.send(Err(e)).await;
                                     return Err(StreamingError::ChunkProcessingError("Failed to process resized chunk".to_string()));
                                 }
@@ -437,7 +446,7 @@ impl StreamHandler {
                             // Process buffer when it reaches the target chunk size
                             while chunk_buffer.len() >= current_chunk_size {
                                 let chunk_data = chunk_buffer.split_to(current_chunk_size).freeze();
-                                if let Err(e) = Self::process_chunk_data(&chunk_sender, &operation_id, &correlation_id, &mut sequence, chunk_data).await {
+                                if let Err(e) = Self::process_chunk_data(&chunk_sender, &operation_id, &correlation_id, &mut sequence, chunk_data, encoding.as_deref()).await {
                                     let _ = chunk_sender.send(Err(e)).await;
                                     return Err(StreamingError::ChunkProcessingError("Failed to process buffered chunk".to_string()));
                                 }
@@ -452,7 +461,7 @@ impl StreamHandler {
                             // Stream completed - process any remaining data in buffer
                             if !chunk_buffer.is_empty() {
                                 let final_chunk_data = chunk_buffer.freeze();
-                                if let Err(e) = Self::process_chunk_data(&chunk_sender, &operation_id, &correlation_id, &mut sequence, final_chunk_data).await {
+                                if let Err(e) = Self::process_chunk_data(&chunk_sender, &operation_id, &correlation_id, &mut sequence, final_chunk_data, encoding.as_deref()).await {
                                     let _ = chunk_sender.send(Err(e)).await;
                                     return Err(StreamingError::ChunkProcessingError("Failed to process final buffered chunk".to_string()));
                                 }
@@ -492,6 +501,7 @@ impl StreamHandler {
         correlation_id: &CorrelationId,
         sequence: &mut u64,
         chunk: Bytes,
+        encoding: Option<&str>,
     ) -> Result<(), StreamingError> {
         let timestamp = Instant::now();
         let original_size = chunk.len();
@@ -501,7 +511,7 @@ impl StreamHandler {
             *sequence, operation_id, correlation_id, original_size
         );
 
-        // Process chunk: calculate hash for integrity and validate size
+        // Calculate hash for integrity
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         chunk.hash(&mut hasher);
         let hash_value = hasher.finish();
@@ -512,14 +522,48 @@ impl StreamHandler {
             return Err(StreamingError::ChunkProcessingError("Chunk size exceeds maximum limit".to_string()));
         }
 
-        // Decompression would be applied here if per-chunk, but handled upstream for streaming
-        let processed_chunk = chunk;
+        // Decompress if needed
+        let (processed_chunk, decompressed) = if let Some(enc) = encoding {
+            match enc.to_lowercase().as_str() {
+                "gzip" => {
+                    match decompress_gzip(&chunk).await {
+                        Ok(decompressed_data) => (Bytes::from(decompressed_data), true),
+                        Err(e) => {
+                            warn!("Gzip decompression failed, using original chunk: {}", e);
+                            (chunk, false)
+                        }
+                    }
+                },
+                "deflate" => {
+                    match decompress_deflate(&chunk).await {
+                        Ok(decompressed_data) => (Bytes::from(decompressed_data), true),
+                        Err(e) => {
+                            warn!("Deflate decompression failed, using original chunk: {}", e);
+                            (chunk, false)
+                        }
+                    }
+                },
+                "br" => {
+                    match decompress_brotli(&chunk).await {
+                        Ok(decompressed_data) => (Bytes::from(decompressed_data), true),
+                        Err(e) => {
+                            warn!("Brotli decompression failed, using original chunk: {}", e);
+                            (chunk, false)
+                        }
+                    }
+                },
+                _ => (chunk, false)
+            }
+        } else {
+            (chunk, false)
+        };
 
         let metadata = ChunkMetadata {
             original_size,
-            compressed_size: None,
+            compressed_size: if decompressed { Some(original_size) } else { None },
             hash: Some(hash_value),
-            encoding: None,
+            encoding: encoding.map(|s| s.to_string()),
+            decompressed,
         };
 
         let stream_chunk = StreamChunk {
@@ -568,6 +612,37 @@ impl StreamHandler {
             },
         }
     }
+}
+
+/// Helper decompression functions for streaming chunks
+async fn decompress_gzip(data: &[u8]) -> Result<Vec<u8>, std::io::Error> {
+    use flate2::read::GzDecoder;
+    use std::io::Read;
+    
+    let mut decoder = GzDecoder::new(data);
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed)?;
+    Ok(decompressed)
+}
+
+async fn decompress_deflate(data: &[u8]) -> Result<Vec<u8>, std::io::Error> {
+    use flate2::read::DeflateDecoder;
+    use std::io::Read;
+    
+    let mut decoder = DeflateDecoder::new(data);
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed)?;
+    Ok(decompressed)
+}
+
+async fn decompress_brotli(data: &[u8]) -> Result<Vec<u8>, std::io::Error> {
+    use brotli::Decompressor;
+    use std::io::Read;
+    
+    let mut decompressor = Decompressor::new(data, 4096);
+    let mut decompressed = Vec::new();
+    decompressor.read_to_end(&mut decompressed)?;
+    Ok(decompressed)
 }
 
 /// Streaming statistics

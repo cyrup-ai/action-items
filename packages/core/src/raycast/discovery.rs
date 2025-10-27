@@ -41,7 +41,7 @@ pub fn discover_raycast_extensions(
     if !raycast_manager.initialized {
         match raycast_manager.loader.initialize() {
             Ok(_) => {
-                // API shim creation is handled by the adapter internally
+                // API adapter creation is handled by the adapter internally
                 info!("Raycast extensions initialized successfully");
                 raycast_manager.initialized = true;
             },

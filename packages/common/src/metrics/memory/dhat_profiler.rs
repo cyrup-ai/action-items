@@ -386,12 +386,15 @@ pub mod testing {
 
     /// Test that a function doesn't leak memory
     pub fn assert_no_leaks<F: FnOnce()>(f: F) -> Result<(), MemoryTestError> {
-        DhatProfiler::assert_memory_usage(f, ExpectedUsage {
-            total_allocations: 0, // Will be overridden by actual count
-            final_allocations: 0, // Should have no remaining allocations
-            max_bytes: None,
-            max_blocks: None,
-        })
+        DhatProfiler::assert_memory_usage(
+            f,
+            ExpectedUsage {
+                total_allocations: 0, // Will be overridden by actual count
+                final_allocations: 0, // Should have no remaining allocations
+                max_bytes: None,
+                max_blocks: None,
+            },
+        )
     }
 
     /// Test that a function uses expected amount of memory
@@ -400,12 +403,15 @@ pub mod testing {
         max_bytes: u64,
         max_blocks: usize,
     ) -> Result<(), MemoryTestError> {
-        DhatProfiler::assert_memory_usage(f, ExpectedUsage {
-            total_allocations: 0, // Will be overridden
-            final_allocations: 0,
-            max_bytes: Some(max_bytes),
-            max_blocks: Some(max_blocks),
-        })
+        DhatProfiler::assert_memory_usage(
+            f,
+            ExpectedUsage {
+                total_allocations: 0, // Will be overridden
+                final_allocations: 0,
+                max_bytes: Some(max_bytes),
+                max_blocks: Some(max_blocks),
+            },
+        )
     }
 
     /// Profile a function and return analysis

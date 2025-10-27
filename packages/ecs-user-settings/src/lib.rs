@@ -65,9 +65,6 @@ mod systems;
 pub mod table_names;
 mod types;
 
-#[cfg(test)]
-mod tests;
-
 pub use components::*;
 pub use error::*;
 pub use events::*;

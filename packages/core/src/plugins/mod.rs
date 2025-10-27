@@ -4,7 +4,7 @@
 //! plugin types including Extism WASM plugins and native plugins. Includes ECS integration,
 //! service bridging, and plugin registry management.
 
-// Re-export core plugin functionality (maintains backward compatibility)
+// Public API re-exports
 pub use core::ActionItem; // Primary ActionItem definition
 // Re-export specific items to avoid ambiguity
 pub use core::{CurrentSearchResults, PendingActionResult, handle_search_results_system};

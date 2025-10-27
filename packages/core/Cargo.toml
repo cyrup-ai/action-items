@@ -15,10 +15,9 @@ uuid.workspace = true
 moka = { workspace = true, features = ["sync"] }
 action_items_ecs_clipboard = { version = "0.1.0", path = "../ecs-clipboard" }
 action_items_ecs_search_aggregator = { version = "0.1.0", path = "../ecs-search-aggregator" }
-# Temporarily disabled due to SurrealDB dependency issues:
-# action_items_ecs_surrealdb = { path = "../ecs-surrealdb" }
+action_items_ecs_surrealdb = { path = "../ecs-surrealdb" }
 notify-rust = { workspace = true }
-# action_items_ecs_fetch = { path = "../ecs-fetch" }  # Temporarily disabled due to compilation errors
+action_items_ecs_fetch = { path = "../ecs-fetch" }  # Temporarily disabled due to compilation errors
 jwalk = { workspace = true }
 rayon = { workspace = true }
 log = { workspace = true }
@@ -115,6 +114,8 @@ libc = "0.2"
 zbus = "5.10.0"
 serde = "1.0.219"
 futures-lite = "2.6.1"
+sequoia-openpgp = { version = "2", default-features = false, features = ["compression", "crypto-nettle"] }
+sequoia-policy-config = "0.8"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # macOS Security.framework integration for capability verification via objc2

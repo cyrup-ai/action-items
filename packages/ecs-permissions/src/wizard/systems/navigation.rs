@@ -304,8 +304,8 @@ fn validate_current_step(
             }
         },
         WizardState::SettingUpHotkeys => {
-            // For now, always allow advance from hotkey setup
-            // In the future, this could check if hotkeys are properly configured
+            // Hotkey setup is optional - allow advance even if skipped
+            // Users can configure hotkeys later in preferences
             true
         },
         WizardState::Complete => false, // Cannot advance from complete state

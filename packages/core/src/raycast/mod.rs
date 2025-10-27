@@ -4,7 +4,7 @@
 //! This module provides complete compatibility with Raycast extensions while maintaining
 //! high performance and clean separation of concerns.
 
-// Re-export adapter functionality (maintains backward compatibility)
+// Public API re-exports
 pub use adapter::*;
 // Re-export all Raycast-specific functionality
 pub use discovery::*;

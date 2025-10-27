@@ -492,19 +492,34 @@ impl MiddlewareProcessor {
             (Some(compressed_body), Some(algorithm)) => {
                 match algorithm {
                     CompressionAlgorithm::Gzip => {
-                        // Gzip decompression would be implemented here
-                        warn!("Gzip decompression not yet implemented");
-                        Ok(Some(compressed_body))
+                        use flate2::read::GzDecoder;
+                        use std::io::Read;
+                        
+                        let mut decoder = GzDecoder::new(&compressed_body[..]);
+                        let mut decompressed = Vec::new();
+                        decoder.read_to_end(&mut decompressed)
+                            .map_err(|e| MiddlewareError::DecompressionError(format!("Gzip decompression failed: {}", e)))?;
+                        Ok(Some(Bytes::from(decompressed)))
                     },
                     CompressionAlgorithm::Deflate => {
-                        // Deflate decompression would be implemented here
-                        warn!("Deflate decompression not yet implemented");
-                        Ok(Some(compressed_body))
+                        use flate2::read::DeflateDecoder;
+                        use std::io::Read;
+                        
+                        let mut decoder = DeflateDecoder::new(&compressed_body[..]);
+                        let mut decompressed = Vec::new();
+                        decoder.read_to_end(&mut decompressed)
+                            .map_err(|e| MiddlewareError::DecompressionError(format!("Deflate decompression failed: {}", e)))?;
+                        Ok(Some(Bytes::from(decompressed)))
                     },
                     CompressionAlgorithm::Brotli => {
-                        // Brotli decompression would be implemented here
-                        warn!("Brotli decompression not yet implemented");
-                        Ok(Some(compressed_body))
+                        use brotli::Decompressor;
+                        use std::io::Read;
+                        
+                        let mut decompressor = Decompressor::new(&compressed_body[..], 4096);
+                        let mut decompressed = Vec::new();
+                        decompressor.read_to_end(&mut decompressed)
+                            .map_err(|e| MiddlewareError::DecompressionError(format!("Brotli decompression failed: {}", e)))?;
+                        Ok(Some(Bytes::from(decompressed)))
                     },
                     CompressionAlgorithm::Identity => Ok(Some(compressed_body)),
                 }

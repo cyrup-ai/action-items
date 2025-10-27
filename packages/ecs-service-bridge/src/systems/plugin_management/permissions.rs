@@ -29,6 +29,8 @@ impl PluginPermissions {
     pub const FILE_READ: u64 = 1 << 8;
     pub const FILE_WRITE: u64 = 1 << 9;
     pub const NETWORK_ACCESS: u64 = 1 << 10;
+    /// Permission to send inter-plugin messages (bit 11)
+    pub const INTER_PLUGIN_MESSAGING: u64 = 1 << 11;
 
     /// Create new permissions with no access
     #[inline]

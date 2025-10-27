@@ -45,6 +45,10 @@ pub enum TlsError {
     PermissionError(String),
     #[error("Permission denied: {0}")]
     PermissionDenied(String),
+    #[error("Domain explicitly excluded by CA name constraints: {domain}")]
+    DomainExcluded { domain: String },
+    #[error("Domain not permitted by CA name constraints: {domain}")]
+    DomainConstraintViolation { domain: String },
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }

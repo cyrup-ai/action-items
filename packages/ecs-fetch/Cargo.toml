@@ -21,6 +21,8 @@ crossbeam-channel = { workspace = true }
 bytes = "1.10.1"
 http = "1.3.1"
 url = "2.5.7"
+flate2 = "1.1.5"
+brotli = "8.0.2"
 ipnet = "2.11.0"
 base64 = "0.22.1"
 urlencoding = "2.1.3"

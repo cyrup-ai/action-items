@@ -6,10 +6,12 @@ use std::time::Duration;
 
 use block2::RcBlock;
 use objc2::rc::{Retained, autoreleasepool};
+use objc2::runtime::Bool;
 use objc2_foundation::{NSArray, NSError, NSNumber, NSString};
 use objc2_user_notifications::{
-    UNAuthorizationStatus, UNMutableNotificationContent, UNNotificationRequest,
-    UNNotificationSound, UNTimeIntervalNotificationTrigger, UNUserNotificationCenter,
+    UNAuthorizationOptions, UNAuthorizationStatus, UNMutableNotificationContent,
+    UNNotificationRequest, UNNotificationSettings, UNNotificationSound,
+    UNTimeIntervalNotificationTrigger, UNUserNotificationCenter,
 };
 use parking_lot::{Condvar, Mutex};
 use tracing::{debug, error, warn};
@@ -44,19 +46,136 @@ impl MacosNotificationBackend {
     /// Check authorization status (blocks until resolved, no stubs)
     fn ensure_authorized(&self) -> bool {
         let (lock, cvar) = &*self.auth_status;
-        let mut auth = lock.lock();
-
-        // Wait with timeout for authorization resolution
-        let timeout = Duration::from_secs(3);
-        let timeout_result = cvar.wait_while_for(&mut auth, |status| status.is_none(), timeout);
-        let timed_out = timeout_result.timed_out();
-
-        if timed_out {
-            warn!("Authorization request timed out");
-            return false;
+        
+        // Fast path: Check if we already have cached authorization status
+        {
+            let auth = lock.lock();
+            if let Some(status) = *auth {
+                return matches!(
+                    status,
+                    UNAuthorizationStatus::Authorized | UNAuthorizationStatus::Provisional
+                );
+            }
         }
-
-        matches!(*auth, Some(UNAuthorizationStatus::Authorized))
+        
+        // No cached status - actively check and request authorization
+        debug!("No cached authorization status, checking with UserNotifications");
+        
+        autoreleasepool(|_| {
+            // Phase 1: Check current authorization status
+            let check_complete = Arc::new((Mutex::new(false), Condvar::new()));
+            let check_complete_clone = Arc::clone(&check_complete);
+            let auth_status_clone = Arc::clone(&self.auth_status);
+            
+            let settings_block = RcBlock::new(move |settings: std::ptr::NonNull<UNNotificationSettings>| {
+                let status = unsafe { settings.as_ref() }.authorizationStatus();
+                
+                debug!("Current authorization status: {:?}", status);
+                
+                // Cache the status
+                {
+                    let (lock, cvar) = &*auth_status_clone;
+                    let mut auth = lock.lock();
+                    *auth = Some(status);
+                    cvar.notify_all();
+                }
+                
+                // Signal check complete
+                {
+                    let (lock, cvar) = &*check_complete_clone;
+                    let mut done = lock.lock();
+                    *done = true;
+                    cvar.notify_all();
+                }
+            });
+            
+            self.notification_center.getNotificationSettingsWithCompletionHandler(&settings_block);
+            
+            // Wait for settings check to complete
+            let (lock, cvar) = &*check_complete;
+            let mut done = lock.lock();
+            let timeout_result = cvar.wait_while_for(&mut done, |d| !*d, Duration::from_secs(5));
+            
+            if timeout_result.timed_out() {
+                warn!("Authorization status check timed out");
+                return false;
+            }
+        });
+        
+        // Check if we need to request authorization
+        let needs_request = {
+            let auth = lock.lock();
+            matches!(*auth, Some(UNAuthorizationStatus::NotDetermined))
+        };
+        
+        if needs_request {
+            debug!("Authorization not determined, requesting user permission");
+            
+            autoreleasepool(|_| {
+                let request_complete = Arc::new((Mutex::new(false), Condvar::new()));
+                let request_complete_clone = Arc::clone(&request_complete);
+                let auth_status_clone = Arc::clone(&self.auth_status);
+                
+                let request_block = RcBlock::new(move |granted: Bool, error: *mut NSError| {
+                    if !error.is_null() {
+                        let err = unsafe { &*error };
+                        error!("Authorization request failed: {:?}", err);
+                    }
+                    
+                    // Update status based on grant result
+                    let new_status = if granted.as_bool() {
+                        UNAuthorizationStatus::Authorized
+                    } else {
+                        UNAuthorizationStatus::Denied
+                    };
+                    
+                    debug!("Authorization request completed: granted={}", granted.as_bool());
+                    
+                    // Cache the new status
+                    {
+                        let (lock, cvar) = &*auth_status_clone;
+                        let mut auth = lock.lock();
+                        *auth = Some(new_status);
+                        cvar.notify_all();
+                    }
+                    
+                    // Signal request complete
+                    {
+                        let (lock, cvar) = &*request_complete_clone;
+                        let mut done = lock.lock();
+                        *done = true;
+                        cvar.notify_all();
+                    }
+                });
+                
+                // Request authorization with Alert, Sound, and Badge options
+                let options = UNAuthorizationOptions::Alert 
+                    | UNAuthorizationOptions::Sound 
+                    | UNAuthorizationOptions::Badge;
+                
+                self.notification_center.requestAuthorizationWithOptions_completionHandler(
+                    options,
+                    &request_block,
+                );
+                
+                // Wait for request to complete
+                let (lock, cvar) = &*request_complete;
+                let mut done = lock.lock();
+                let timeout_result = cvar.wait_while_for(&mut done, |d| !*d, Duration::from_secs(10));
+                
+                if timeout_result.timed_out() {
+                    warn!("Authorization request timed out");
+                    return false;
+                }
+            });
+        }
+        
+        // Final check: Return authorization status
+        let auth = lock.lock();
+        matches!(
+            *auth,
+            Some(UNAuthorizationStatus::Authorized) | Some(UNAuthorizationStatus::Provisional)
+        )
     }
 
     /// Create notification content with complete configuration

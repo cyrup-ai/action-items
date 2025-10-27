@@ -161,40 +161,55 @@ impl ViolationDetector {
 
     /// Setup default performance thresholds
     fn setup_default_thresholds(&self) {
-        self.set_threshold("latency_ms", ViolationThreshold {
-            threshold: 1000.0,
-            threshold_type: ThresholdType::LessThan,
-            severity: ViolationSeverity::Warning,
-            description: "Request latency should be under 1 second".to_string(),
-        });
+        self.set_threshold(
+            "latency_ms",
+            ViolationThreshold {
+                threshold: 1000.0,
+                threshold_type: ThresholdType::LessThan,
+                severity: ViolationSeverity::Warning,
+                description: "Request latency should be under 1 second".to_string(),
+            },
+        );
 
-        self.set_threshold("memory_usage_mb", ViolationThreshold {
-            threshold: 1024.0,
-            threshold_type: ThresholdType::LessThan,
-            severity: ViolationSeverity::Error,
-            description: "Memory usage should be under 1GB".to_string(),
-        });
+        self.set_threshold(
+            "memory_usage_mb",
+            ViolationThreshold {
+                threshold: 1024.0,
+                threshold_type: ThresholdType::LessThan,
+                severity: ViolationSeverity::Error,
+                description: "Memory usage should be under 1GB".to_string(),
+            },
+        );
 
-        self.set_threshold("cpu_usage_percent", ViolationThreshold {
-            threshold: 80.0,
-            threshold_type: ThresholdType::LessThan,
-            severity: ViolationSeverity::Warning,
-            description: "CPU usage should be under 80%".to_string(),
-        });
+        self.set_threshold(
+            "cpu_usage_percent",
+            ViolationThreshold {
+                threshold: 80.0,
+                threshold_type: ThresholdType::LessThan,
+                severity: ViolationSeverity::Warning,
+                description: "CPU usage should be under 80%".to_string(),
+            },
+        );
 
-        self.set_threshold("error_rate_percent", ViolationThreshold {
-            threshold: 5.0,
-            threshold_type: ThresholdType::LessThan,
-            severity: ViolationSeverity::Error,
-            description: "Error rate should be under 5%".to_string(),
-        });
+        self.set_threshold(
+            "error_rate_percent",
+            ViolationThreshold {
+                threshold: 5.0,
+                threshold_type: ThresholdType::LessThan,
+                severity: ViolationSeverity::Error,
+                description: "Error rate should be under 5%".to_string(),
+            },
+        );
 
-        self.set_threshold("queue_depth", ViolationThreshold {
-            threshold: 1000.0,
-            threshold_type: ThresholdType::LessThan,
-            severity: ViolationSeverity::Warning,
-            description: "Queue depth should be under 1000 items".to_string(),
-        });
+        self.set_threshold(
+            "queue_depth",
+            ViolationThreshold {
+                threshold: 1000.0,
+                threshold_type: ThresholdType::LessThan,
+                severity: ViolationSeverity::Warning,
+                description: "Queue depth should be under 1000 items".to_string(),
+            },
+        );
     }
 
     /// Set threshold for a metric

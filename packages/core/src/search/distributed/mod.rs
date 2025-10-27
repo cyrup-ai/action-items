@@ -11,7 +11,7 @@ pub mod response_processing;
 pub mod result_management;
 pub mod types;
 
-// Re-export main types and functions for backward compatibility
+// Public API re-exports
 pub use orchestration::distributed_search_system;
 pub use plugin_management::{
     broadcast_capability_updates, discover_plugins_via_service_bridge, monitor_search_plugin_health,

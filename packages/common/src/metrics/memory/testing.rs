@@ -45,8 +45,28 @@ impl std::fmt::Display for MemoryTestError {
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tokio::sync::Mutex;
+use once_cell::sync::Lazy;
+use tokio::sync::{Mutex, Semaphore};
 use tracing::{debug, error, info, warn};
+
+/// Maximum concurrent blocking test operations to prevent thread pool exhaustion
+const MAX_CONCURRENT_BLOCKING_TESTS: usize = 4;
+
+/// Semaphore to limit concurrent spawn_blocking operations in memory tests.
+///
+/// Tokio's default blocking thread pool size is limited (typically 512 threads max,
+/// starting with num_cpus threads). Running too many concurrent CPU-intensive blocking
+/// operations can exhaust this pool and cause deadlocks or performance degradation.
+///
+/// This limit of 4 concurrent operations provides:
+/// - Safe resource usage on typical dev/CI machines (4-8 cores)
+/// - Prevents thread pool starvation during parallel test runs
+/// - Allows reasonable throughput while maintaining stability
+/// - Conservative choice based on test intensity (25MB+ allocations per test)
+///
+/// For more details, see Tokio's spawn_blocking documentation on thread pool configuration.
+static BLOCKING_TEST_SEMAPHORE: Lazy<Semaphore> =
+    Lazy::new(|| Semaphore::new(MAX_CONCURRENT_BLOCKING_TESTS));
 
 /// Comprehensive memory leak testing framework for CI/CD integration
 #[derive(Debug)]
@@ -340,15 +360,67 @@ impl MemoryLeakTestSuite {
         Ok(result)
     }
 
-    /// Run test function with real timeout using tokio::time::timeout
+    /// Run test function with timeout and concurrency limiting.
+    ///
+    /// # Why spawn_blocking is Used
+    ///
+    /// Memory leak tests perform CPU-intensive synchronous operations:
+    /// - Large memory allocations (up to 100MB+ via Vec::new())
+    /// - Tight loops with many small allocations (100-1000 iterations)
+    /// - Memory stress testing with real blocking behavior to simulate plugin loads
+    ///
+    /// These operations must run on Tokio's blocking thread pool because:
+    /// 1. Standard library memory APIs (Vec, Box) are synchronous and blocking
+    /// 2. They are CPU-bound (allocation loops) and would stall the async runtime
+    /// 3. Accurate memory profiling requires dedicated threads without async overhead
+    /// 4. No viable async alternatives exist for these low-level operations
+    ///
+    /// # Concurrency Protection
+    ///
+    /// Uses `BLOCKING_TEST_SEMAPHORE` to limit concurrent operations to 4.
+    /// This prevents exhaustion of Tokio's shared blocking thread pool (max 512 threads)
+    /// when multiple test instances or suites run in parallel.
+    ///
+    /// Without limiting, concurrent tests could:
+    /// - Exhaust available threads, causing deadlocks
+    /// - Degrade system performance during CI runs
+    /// - Lead to indefinite hangs if pool is saturated
+    ///
+    /// # Timeout Protection
+    ///
+    /// Each test has a configurable timeout (default 10-30 seconds) to prevent
+    /// indefinite blocking from faulty tests.
+    ///
+    /// # Error Handling
+    ///
+    /// Returns:
+    /// - `Ok(())` if test passes within timeout
+    /// - `Err(MemoryTestError::TrackingError)` if task panics or semaphore acquire fails
+    /// - `Err(MemoryTestError::AssertionFailed)` if timeout exceeded
+    ///
+    /// The semaphore permit is automatically released on function exit (via Drop).
     async fn run_with_timeout(&self, scenario: &LeakTestScenario) -> Result<(), MemoryTestError> {
         let test_fn = scenario.test_fn.clone();
+
+        // Acquire semaphore permit to limit concurrent blocking operations.
+        // This prevents thread pool exhaustion in high-concurrency scenarios.
+        let _permit = BLOCKING_TEST_SEMAPHORE.acquire().await.map_err(|e| {
+            MemoryTestError::TrackingError(format!(
+                "Failed to acquire blocking test semaphore (pool saturated?): {}",
+                e
+            ))
+        })?;
+
+        // Note: _permit holds the semaphore until dropped (end of function or early return).
+        // Ensures release even on panic or error paths.
 
         let timeout_result = tokio::time::timeout(
             scenario.timeout,
             tokio::task::spawn_blocking(move || test_fn()),
         )
         .await;
+
+        // Semaphore automatically released here via Drop.
 
         match timeout_result {
             Ok(join_result) => match join_result {

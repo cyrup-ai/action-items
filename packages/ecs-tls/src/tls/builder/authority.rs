@@ -127,6 +127,126 @@ pub fn extract_key_size(parsed_cert: &ParsedCertificate) -> Option<u32> {
     }
 }
 
+/// Validate domain against CA certificate name constraints
+/// Returns true if domain is permitted, false if rejected or on error
+fn validate_domain_with_cert_constraints(cert_pem: &str, domain: &str) -> Result<bool, TlsError> {
+    use x509_parser::prelude::*;
+    
+    // Parse the certificate from PEM
+    let (_, pem) = parse_x509_pem(cert_pem.as_bytes())
+        .map_err(|e| TlsError::CertificateParsing(
+            format!("Failed to parse CA certificate PEM: {}", e)
+        ))?;
+    
+    let cert = pem.parse_x509()
+        .map_err(|e| TlsError::CertificateParsing(
+            format!("Failed to parse X.509 certificate: {}", e)
+        ))?;
+    
+    // Extract name constraints extension using x509-parser's built-in method
+    match cert.name_constraints() {
+        Ok(Some(ext)) => {
+            // Name constraints present, validate domain against them
+            validate_domain_against_constraints(domain, ext.value)?;
+            Ok(true)
+        },
+        Ok(None) => {
+            // No name constraints extension = no restrictions, domain permitted
+            Ok(true)
+        },
+        Err(e) => Err(TlsError::CertificateParsing(
+            format!("Failed to extract name constraints: {}", e)
+        )),
+    }
+}
+
+/// Check if domain matches a DNS name constraint pattern per RFC 5280
+/// 
+/// Rules:
+/// - Pattern ".example.com" matches "sub.example.com" AND "example.com"
+/// - Pattern "example.com" matches ONLY "example.com" (no subdomains)
+/// - Matching is case-insensitive
+fn dns_name_matches(domain: &str, pattern: &str) -> bool {
+    let domain_lower = domain.to_lowercase();
+    let pattern_lower = pattern.to_lowercase();
+    
+    // Exact match
+    if domain_lower == pattern_lower {
+        return true;
+    }
+    
+    // Subdomain match: pattern starts with '.'
+    if pattern_lower.starts_with('.') {
+        // Domain must end with the pattern (including the leading dot)
+        // OR domain must equal the pattern without the leading dot
+        let suffix = &pattern_lower[1..]; // Remove leading dot
+        
+        if domain_lower == suffix {
+            // Exact match with base domain (pattern ".example.com" matches "example.com")
+            return true;
+        }
+        
+        if domain_lower.ends_with(&pattern_lower) {
+            // Subdomain match (pattern ".example.com" matches "www.example.com")
+            return true;
+        }
+    }
+    
+    false
+}
+
+/// Validate that a domain satisfies CA name constraints
+/// 
+/// Per RFC 5280:
+/// 1. Check excluded subtrees first (they take precedence)
+/// 2. If excluded subtrees present and domain matches any, REJECT
+/// 3. If permitted subtrees present, domain must match at least one
+/// 4. If no permitted subtrees, all names are permitted (unless excluded)
+fn validate_domain_against_constraints(
+    domain: &str,
+    constraints: &x509_parser::extensions::NameConstraints,
+) -> Result<(), TlsError> {
+    use x509_parser::extensions::GeneralName;
+    
+    // STEP 1: Check excluded subtrees (RFC 5280: exclusions take precedence)
+    if let Some(excluded) = &constraints.excluded_subtrees {
+        for subtree in excluded {
+            if let GeneralName::DNSName(pattern) = &subtree.base {
+                if dns_name_matches(domain, pattern) {
+                    return Err(TlsError::DomainExcluded {
+                        domain: domain.to_string(),
+                    });
+                }
+            }
+        }
+    }
+    
+    // STEP 2: Check permitted subtrees
+    if let Some(permitted) = &constraints.permitted_subtrees {
+        // If permitted subtrees exist, domain MUST match at least one
+        let mut found_match = false;
+        
+        for subtree in permitted {
+            if let GeneralName::DNSName(pattern) = &subtree.base {
+                if dns_name_matches(domain, pattern) {
+                    found_match = true;
+                    break;
+                }
+            }
+        }
+        
+        if !found_match {
+            return Err(TlsError::DomainConstraintViolation {
+                domain: domain.to_string(),
+            });
+        }
+    }
+    
+    // STEP 3: Domain passed all checks
+    // Either: no excluded match AND (no permitted list OR matched permitted)
+    Ok(())
+}
+
 /// Certificate Authority domain object with serialization support
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CertificateAuthority {
@@ -205,9 +325,29 @@ impl CertificateAuthority {
             }
         }
 
-        // Check if CA has domain constraints (if implemented)
-        // For now, allow all valid domains if CA is valid
-        true
+        // Validate domain against CA name constraints per RFC 5280
+        match validate_domain_with_cert_constraints(&self.certificate_pem, domain) {
+            Ok(true) => true,  // Domain satisfies constraints
+            Ok(false) => {
+                // This case shouldn't happen with current implementation
+                tracing::warn!(
+                    "Domain '{}' rejected by CA '{}' name constraints",
+                    domain,
+                    self.name
+                );
+                false
+            },
+            Err(e) => {
+                // Constraint validation failed (either excluded or not permitted)
+                tracing::warn!(
+                    "Domain '{}' rejected by CA '{}' name constraints: {}",
+                    domain,
+                    self.name,
+                    e
+                );
+                false  // Fail closed for security
+            }
+        }
     }
 }
 

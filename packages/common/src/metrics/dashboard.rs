@@ -257,9 +257,9 @@ impl DashboardData {
             .latency_tracker()
             .percentiles(&[50.0, 90.0, 95.0, 99.0]);
 
-        snapshot
-            .latency_stats
-            .insert("overall".to_string(), LatencySnapshot {
+        snapshot.latency_stats.insert(
+            "overall".to_string(),
+            LatencySnapshot {
                 operation: "overall".to_string(),
                 total_measurements: latency_stats.total_measurements,
                 average_us: latency_stats.average_us,
@@ -269,7 +269,8 @@ impl DashboardData {
                 p90_us: percentiles.get("p90.0").copied().unwrap_or(0),
                 p95_us: percentiles.get("p95.0").copied().unwrap_or(0),
                 p99_us: percentiles.get("p99.0").copied().unwrap_or(0),
-            });
+            },
+        );
 
         // Collect violation statistics
         let violation_stats = metrics_system.violation_detector().statistics();

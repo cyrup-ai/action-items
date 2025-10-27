@@ -9,6 +9,7 @@ description = "Bevy ECS search aggregator plugin for Action Items launcher"
 bevy = { workspace = true }
 action_items_common = { path = "../common" }
 ecs-service-bridge = { path = "../ecs-service-bridge" }
+action_items_ecs_cache = { path = "../ecs-cache" }
 
 serde = { workspace = true }
 serde_json = { workspace = true }

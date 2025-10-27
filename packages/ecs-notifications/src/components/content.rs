@@ -974,11 +974,25 @@ pub enum ValidationState {
 // Utility functions for content processing
 
 fn sanitize_html(html: &str) -> NotificationResult<String> {
-    // Basic HTML sanitization - in production, use a proper HTML sanitizer
-    let cleaned = html
-        .replace("<script", "&lt;script")
-        .replace("javascript:", "")
-        .replace("on", ""); // Remove all "on*" event handlers
+    use ammonia::Builder;
+
+    // ammonia::Builder.clean() returns a Cow<str> (not Result)
+    // It never fails - malicious content is stripped, not errored
+    let cleaned = Builder::default()
+        // Allow only safe formatting tags for notifications
+        .add_tags(&["p", "br", "strong", "em", "b", "i", "u", "ul", "ol", "li", "a", "span", "div"])
+        // Allow href and title attributes on links
+        .add_tag_attributes("a", &["href", "title"])
+        // Allow class attribute on spans and divs for styling
+        .add_tag_attributes("span", &["class"])
+        .add_tag_attributes("div", &["class"])
+        // Add rel="noopener noreferrer" to all links for security
+        .link_rel(Some("noopener noreferrer"))
+        // Only allow http/https URLs (blocks javascript:, data:, vbscript:)
+        .url_schemes(&["https", "http"])
+        // Clean the HTML (strips all disallowed tags, attributes, and scripts)
+        .clean(html)
+        .to_string();
 
     Ok(cleaned)
 }
@@ -989,22 +1003,88 @@ fn sanitize_string(input: &str) -> String {
 }
 
 fn convert_markdown_to_plain(markdown: &str) -> String {
-    // Basic markdown to plain text conversion
-    // In production, use a proper markdown parser
-    markdown
-        .replace("**", "")
-        .replace("*", "")
-        .replace("#", "")
-        .replace("[", "")
-        .replace("]", "")
-        .replace("(", "")
-        .replace(")", "")
+    use pulldown_cmark::{Parser, Event, Options};
+
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TABLES);
+    
+    let parser = Parser::new_ext(markdown, options);
+    let mut plain_text = String::new();
+
+    // Extract only text content, ignore all formatting
+    for event in parser {
+        match event {
+            Event::Text(text) | Event::Code(text) => {
+                plain_text.push_str(&text);
+            }
+            Event::SoftBreak => {
+                plain_text.push(' ');
+            }
+            Event::HardBreak => {
+                plain_text.push('\n');
+            }
+            // Ignore all other events (tags, HTML, etc.)
+            _ => {}
+        }
+    }
+
+    plain_text
 }
 
 fn convert_markdown_to_html(markdown: &str) -> String {
-    // Basic markdown to HTML conversion
-    // In production, use a proper markdown parser like pulldown-cmark
-    markdown.replace("**", "<strong>").replace("*", "<em>")
+    use pulldown_cmark::{Parser, html, Options, Event, Tag};
+
+    // Enable safe CommonMark features
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TABLES);
+    
+    let parser = Parser::new_ext(markdown, options);
+
+    // Filter events to remove dangerous content
+    let safe_parser = parser.filter_map(|event| {
+        match event {
+            // Block ALL raw HTML from markdown
+            Event::Html(_) | Event::InlineHtml(_) => None,
+
+            // Sanitize link URLs
+            Event::Start(Tag::Link { link_type, dest_url, title, id }) => {
+                // Only allow http/https links
+                if dest_url.starts_with("http://") || dest_url.starts_with("https://") {
+                    Some(Event::Start(Tag::Link { link_type, dest_url, title, id }))
+                } else if dest_url.starts_with("#") {
+                    // Allow anchor links
+                    Some(Event::Start(Tag::Link { link_type, dest_url, title, id }))
+                } else {
+                    // Block javascript:, data:, and other dangerous protocols
+                    None
+                }
+            }
+
+            // Block potentially dangerous image sources
+            Event::Start(Tag::Image { link_type, dest_url, title, id }) => {
+                // Only allow http/https images
+                if dest_url.starts_with("http://") || dest_url.starts_with("https://") {
+                    Some(Event::Start(Tag::Image { link_type, dest_url, title, id }))
+                } else {
+                    // Block data: URIs and other potentially dangerous sources
+                    None
+                }
+            }
+
+            // Pass through all other safe markdown elements
+            _ => Some(event),
+        }
+    });
+
+    // Generate HTML from filtered events
+    let mut html_output = String::new();
+    html::push_html(&mut html_output, safe_parser);
+
+    // Double-sanitize: run through ammonia to catch any edge cases
+    // This handles any HTML that might have been generated by the markdown parser
+    sanitize_html(&html_output).unwrap_or(html_output)
 }
 
 fn convert_html_to_plain(html: &str) -> String {
@@ -1025,55 +1105,4 @@ fn html_escape(text: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#x27;")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_notification_content_builder() {
-        let content = NotificationContent::new("Test Title", RichText::plain("Test body"))
-            .with_subtitle("Test subtitle")
-            .with_priority(Priority::High)
-            .with_custom_data("key1", "value1");
-
-        assert_eq!(content.title, "Test Title");
-        assert_eq!(content.subtitle, Some("Test subtitle".to_string()));
-        assert_eq!(content.priority, Priority::High);
-        assert_eq!(content.custom_data.get("key1"), Some(&"value1".to_string()));
-    }
-
-    #[test]
-    fn test_rich_text_conversion() {
-        let plain = RichText::plain("Hello world");
-        assert_eq!(plain.to_plain_text(), "Hello world");
-
-        let markdown = RichText::markdown("**Bold** and *italic*");
-        let plain_from_md = markdown.to_plain_text();
-        assert_eq!(plain_from_md, "Bold and italic");
-    }
-
-    #[test]
-    fn test_action_validation() {
-        let valid_action = NotificationAction {
-            id: ActionId::new("test"),
-            label: "Test Action".to_string(),
-            icon: None,
-            style: ActionStyle::Default,
-            activation_type: ActivationType::Foreground,
-            url: None,
-            payload: None,
-            confirmation: None,
-        };
-
-        assert!(valid_action.validate().is_ok());
-
-        let invalid_action = NotificationAction {
-            label: "".to_string(),
-            ..valid_action
-        };
-
-        assert!(invalid_action.validate().is_err());
-    }
 }

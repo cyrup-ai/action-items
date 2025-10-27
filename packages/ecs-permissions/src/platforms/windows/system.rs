@@ -1,4 +1,12 @@
 //! Windows system-level permissions (Screen capture, Input monitoring, Admin)
+//!
+//! ## Administrator Elevation Flow
+//! 1. `check_admin_access()` - Query current administrator status
+//! 2. `request_admin_access()` - Request elevation (returns PromptRequired if needed)
+//! 3. Caller displays UAC prompt and relaunches with elevated privileges
+//!
+//! This matches the macOS/Linux pattern where `PromptRequired` indicates
+//! the caller should surface an elevation UI (UAC on Windows, sudo on Unix).
 
 use std::sync::mpsc::Sender;
 
@@ -160,11 +168,27 @@ pub fn request_input_monitoring(tx: Sender<Result<PermissionStatus, PermissionEr
     }
 }
 
+/// Request administrator access on Windows
+/// 
+/// Returns PermissionStatus:
+/// - `Authorized`: Current process has administrator privileges
+/// - `PromptRequired`: User should be prompted for UAC elevation
+/// - `Denied`: Unable to check administrator status or API error
+/// 
+/// Callers receiving `PromptRequired` must:
+/// 1. Display UAC elevation prompt to user
+/// 2. Re-launch process with elevated privileges if user approves
+/// 3. Handle case where user denies elevation
+/// 
+/// Cross-platform note: macOS/Linux use different elevation mechanisms
+/// (sudo prompts) but follow similar PromptRequired → elevate workflow.
 pub fn request_admin_access(tx: Sender<Result<PermissionStatus, PermissionError>>) {
     #[cfg(target_os = "windows")]
     {
         // Use same administrator checking logic as check_permission
         let result = unsafe {
+            // Check if current token is member of Administrators group
+            // This uses well-known SID for built-in Administrators group
             let mut admin_group: [u8; 256] = [0; 256];
             let mut admin_group_size = admin_group.len() as u32;
             if CreateWellKnownSid(

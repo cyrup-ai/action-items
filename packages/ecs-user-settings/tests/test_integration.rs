@@ -7,121 +7,118 @@
 //! - Migration from JSON files
 //! - Error handling and edge cases
 
-#[cfg(test)]
-mod validation_tests {
-    use crate::types::{validate_table_name, parse_record_id, VALID_TABLES};
-    use crate::error::SettingsError;
+use action_items_ecs_user_settings::types::{validate_table_name, parse_record_id, VALID_TABLES};
+use action_items_ecs_user_settings::error::SettingsError;
 
-    #[test]
-    fn test_all_valid_tables_accepted() {
-        for table in VALID_TABLES {
-            assert!(
-                validate_table_name(table).is_ok(),
-                "Valid table {} should be accepted",
-                table
-            );
-        }
-    }
-
-    #[test]
-    fn test_invalid_table_rejected() {
-        let invalid_tables = vec![
-            "invalid_table",
-            "users; DROP TABLE",
-            "DROP DATABASE users",
-            "../../../etc/passwd",
-            "'; DELETE FROM users--",
-            "admin' OR '1'='1",
-        ];
-
-        for table in invalid_tables {
-            assert!(
-                validate_table_name(table).is_err(),
-                "Invalid table '{}' should be rejected",
-                table
-            );
-        }
-    }
-
-    #[test]
-    fn test_record_id_construction() {
-        let result = parse_record_id("user_preferences", "main");
-        assert!(result.is_ok(), "Should parse valid table and key");
-        
-        let record_id = result.expect("should parse");
-        assert_eq!(
-            record_id.to_string(),
-            "user_preferences:main",
-            "RecordId should format correctly"
+#[test]
+fn test_all_valid_tables_accepted() {
+    for table in VALID_TABLES {
+        assert!(
+            validate_table_name(table).is_ok(),
+            "Valid table {} should be accepted",
+            table
         );
     }
+}
 
-    #[test]
-    fn test_sql_injection_prevention_table() {
-        // Table injection should be blocked by whitelist
-        let injection_attempts = vec![
-            ("users; DROP TABLE settings", "test"),
-            ("admin' OR '1'='1", "test"),
-            ("'; DELETE FROM users--", "test"),
-            ("../../../etc/passwd", "config"),
-        ];
+#[test]
+fn test_invalid_table_rejected() {
+    let invalid_tables = vec![
+        "invalid_table",
+        "users; DROP TABLE",
+        "DROP DATABASE users",
+        "../../../etc/passwd",
+        "'; DELETE FROM users--",
+        "admin' OR '1'='1",
+    ];
 
-        for (table, key) in injection_attempts {
-            let result = parse_record_id(table, key);
-            assert!(
-                result.is_err(),
-                "SQL injection attempt with table '{}' should be rejected",
-                table
-            );
+    for table in invalid_tables {
+        assert!(
+            validate_table_name(table).is_err(),
+            "Invalid table '{}' should be rejected",
+            table
+        );
+    }
+}
 
-            if let Err(e) = result {
-                match e {
-                    SettingsError::InvalidValue(_) => {
-                        // Expected - table not in whitelist
-                    },
-                    _ => panic!("Expected InvalidValue error, got {:?}", e),
-                }
+#[test]
+fn test_record_id_construction() {
+    let result = parse_record_id("user_preferences", "main");
+    assert!(result.is_ok(), "Should parse valid table and key");
+    
+    let record_id = result.expect("should parse");
+    assert_eq!(
+        record_id.to_string(),
+        "user_preferences:main",
+        "RecordId should format correctly"
+    );
+}
+
+#[test]
+fn test_sql_injection_prevention_table() {
+    // Table injection should be blocked by whitelist
+    let injection_attempts = vec![
+        ("users; DROP TABLE settings", "test"),
+        ("admin' OR '1'='1", "test"),
+        ("'; DELETE FROM users--", "test"),
+        ("../../../etc/passwd", "config"),
+    ];
+
+    for (table, key) in injection_attempts {
+        let result = parse_record_id(table, key);
+        assert!(
+            result.is_err(),
+            "SQL injection attempt with table '{}' should be rejected",
+            table
+        );
+
+        if let Err(e) = result {
+            match e {
+                SettingsError::InvalidValue(_) => {
+                    // Expected - table not in whitelist
+                },
+                _ => panic!("Expected InvalidValue error, got {:?}", e),
             }
         }
     }
+}
 
-    #[test]
-    fn test_sql_injection_prevention_key() {
-        // Key injection is handled by RecordId type safety
-        // RecordId wraps dangerous keys in ⟨⟩ brackets to escape them
-        let injection_keys = vec![
-            "'; DELETE FROM users--",
-            "admin' OR '1'='1",
-            "test'; DROP TABLE settings; --",
-        ];
+#[test]
+fn test_sql_injection_prevention_key() {
+    // Key injection is handled by RecordId type safety
+    // RecordId wraps dangerous keys in ⟨⟩ brackets to escape them
+    let injection_keys = vec![
+        "'; DELETE FROM users--",
+        "admin' OR '1'='1",
+        "test'; DROP TABLE settings; --",
+    ];
 
-        for key in injection_keys {
-            let result = parse_record_id("user_preferences", key);
+    for key in injection_keys {
+        let result = parse_record_id("user_preferences", key);
+        assert!(
+            result.is_ok(),
+            "RecordId should accept key '{}' (escaping is handled internally)",
+            key
+        );
+
+        if let Ok(rid) = result {
+            let id_str = rid.to_string();
+            // RecordId escapes special chars - check for escape markers ⟨⟩
             assert!(
-                result.is_ok(),
-                "RecordId should accept key '{}' (escaping is handled internally)",
-                key
+                id_str.contains("⟨") && id_str.contains("⟩"),
+                "RecordId should escape dangerous keys with ⟨⟩ brackets, got: {}",
+                id_str
             );
-
-            if let Ok(rid) = result {
-                let id_str = rid.to_string();
-                // RecordId escapes special chars - check for escape markers ⟨⟩
-                assert!(
-                    id_str.contains("⟨") && id_str.contains("⟩"),
-                    "RecordId should escape dangerous keys with ⟨⟩ brackets, got: {}",
-                    id_str
-                );
-            }
         }
     }
+}
 
-    #[test]
-    fn test_case_sensitivity() {
-        // Table names must match exactly (case-sensitive)
-        assert!(parse_record_id("user_preferences", "test").is_ok());
-        assert!(parse_record_id("User_Preferences", "test").is_err());
-        assert!(parse_record_id("USER_PREFERENCES", "test").is_err());
-    }
+#[test]
+fn test_case_sensitivity() {
+    // Table names must match exactly (case-sensitive)
+    assert!(parse_record_id("user_preferences", "test").is_ok());
+    assert!(parse_record_id("User_Preferences", "test").is_err());
+    assert!(parse_record_id("USER_PREFERENCES", "test").is_err());
 }
 
 // Integration tests are disabled pending DatabaseService test API
@@ -134,9 +131,9 @@ mod integration_tests {
     use std::collections::HashMap;
     use action_items_ecs_surrealdb::DatabaseService;
     
-    use crate::events::*;
-    use crate::plugin::UserSettingsPlugin;
-    use crate::schema::USER_SETTINGS_SCHEMA;
+    use action_items_ecs_user_settings::events::*;
+    use action_items_ecs_user_settings::plugin::UserSettingsPlugin;
+    use action_items_ecs_user_settings::schema::USER_SETTINGS_SCHEMA;
 
     /// Helper to create test app with database
     async fn create_test_app() -> App {
@@ -468,7 +465,7 @@ mod migration_tests {
     use serde_json::json;
     
     use action_items_ecs_surrealdb::DatabaseService;
-    use crate::migration::*;
+    use action_items_ecs_user_settings::migration::*;
 
     #[tokio::test]
     async fn test_hotkey_migration() {

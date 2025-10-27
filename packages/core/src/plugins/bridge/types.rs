@@ -28,6 +28,13 @@ pub enum ServiceRequest {
     /// Request to write to storage
     StorageWrite(StorageWriteRequest),
     /// WASM callback request
+    /// 
+    /// Supported function names:
+    /// - `process_data`: Transform input data according to plugin logic
+    /// - `init`: Initialize plugin state
+    /// - `cleanup`: Clean up plugin resources
+    /// - `validate_input`: Validate input data format/content
+    /// - `transform_data`: Apply data transformations
     WasmCallback {
         plugin_id: String,
         function_name: String,

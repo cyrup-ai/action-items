@@ -38,7 +38,7 @@ pub mod service_bridge;
 
 // All ECS services are now enabled and integrated
 
-// Re-export essential types for backward compatibility
+// Public API re-exports
 pub use action_items_common::directories::AppDirectories;
 pub use action_items_common::plugin_interface::{ActionItem, PluginCapabilities, PluginManifest};
 // Re-export ECS service types that the app depends on
@@ -119,4 +119,4 @@ impl Plugin for ActionItemsCorePlugin {
 }
 
 // Simple convenience re-exports for common functionality
-pub use ActionItemsCorePlugin as LauncherPlugin; // Backward compatibility alias
+pub use ActionItemsCorePlugin as LauncherPlugin; // Alternative name for clarity

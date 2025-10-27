@@ -90,6 +90,14 @@ impl Capability {
     }
 }
 
+// Capability name constants for inter-plugin messaging
+// Following new pattern of using constants instead of string literals
+pub const CAPABILITY_INTER_PLUGIN_MESSAGING: &str = "inter_plugin_messaging";
+
+// Metadata keys for messaging capabilities
+pub const METADATA_ALLOWED_TARGETS: &str = "allowed_targets";
+pub const METADATA_ALLOWED_MESSAGE_TYPES: &str = "allowed_message_types";
+
 /// Component for tracking message routing state with optimized memory layout
 #[derive(Component, Debug, Clone)]
 #[repr(C)] // Optimal memory layout for cache efficiency

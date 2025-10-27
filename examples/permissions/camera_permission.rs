@@ -2,7 +2,7 @@
 //! 
 //! Demonstrates requesting camera access with proper error handling.
 
-use action_items_ecs_permissions::{PermissionType, PermissionStatus, PermissionPlugin};
+use action_items_ecs_permissions::{PermissionType, PermissionStatus, PermissionPlugin, PermissionRequest};
 use bevy::prelude::*;
 
 fn main() {
@@ -16,6 +16,7 @@ fn main() {
 
 fn request_camera_permission(
     permission_res: Res<action_items_ecs_permissions::PermissionResource>,
+    mut permission_requests: EventWriter<PermissionRequest>,
 ) {
     match permission_res.check_permission(PermissionType::Camera) {
         Ok(PermissionStatus::Authorized) => {
@@ -26,7 +27,7 @@ fn request_camera_permission(
         }
         Ok(PermissionStatus::NotDetermined) => {
             info!("Camera permission not determined, requesting access...");
-            // In a real app, you would trigger a permission request here
+            permission_requests.send(PermissionRequest { typ: PermissionType::Camera });
         }
         Ok(status) => {
             info!("Camera permission status: {}", status);

@@ -48,11 +48,7 @@ pub trait NativePlugin: Send + Sync {
         &mut self,
         _context: PluginContext,
         task_pool: &AsyncComputeTaskPool,
-    ) -> Task<Result<(), Error>> {
-        task_pool.spawn(async move {
-            Ok(())
-        })
-    }
+    ) -> Task<Result<(), Error>>;
 
     /// Clean up resources
     fn cleanup(

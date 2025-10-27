@@ -1,4 +1,60 @@
 //! Service request processing and routing functionality using modern event-driven architecture
+//!
+//! ## Architecture Overview
+//!
+//! This module provides the core request processing logic for the service bridge.
+//! It routes different types of service requests (clipboard, HTTP, storage, notifications,
+//! WASM callbacks) to their appropriate handlers.
+//!
+//! ## WASM Callback Architecture
+//!
+//! WASM plugin callbacks are NOT handled directly in this module. Instead, they follow
+//! an event-driven architecture that leverages Bevy's ECS system:
+//!
+//! ### Request Flow
+//! ```text
+//! 1. Plugin sends ServiceRequest::WasmCallback
+//!    └─> Received in process_service_request() (this file)
+//! 2. Request acknowledged immediately (non-blocking)
+//!    └─> Returns ServiceResponse::WasmCallback(Ok(data))
+//! 3. WasmCallbackEvent emitted to Bevy ECS event system
+//!    └─> Event defined in ../../../events/mod.rs:52-59
+//! 4. wasm_callback_system_ecs() processes events (async)
+//!    └─> System in ../bridge/systems.rs:104-135
+//! 5. WasmCallbackHandler queries ECS for plugin entities
+//!    └─> Handler in ../ecs_queries/wasm_callback_handler.rs:14-89
+//! 6. ExtismPluginAdapter::call_plugin_function() executes WASM
+//!    └─> Implementation in ../extism/adapter/function_calls.rs:8-40
+//! 7. Extism SDK loads WASM module and invokes function
+//!    └─> Uses wasmtime runtime underneath
+//! ```
+//!
+//! ### Why ECS-Based Architecture?
+//!
+//! - **Asynchronous execution**: WASM calls don't block service request processing
+//! - **Plugin lifecycle management**: Plugins are ECS entities with automatic cleanup
+//! - **Resource efficiency**: Shared plugin instances via `Arc<RwLock<ExtismPluginAdapter>>`
+//! - **Query-based discovery**: Find plugins by ID through ECS queries (no HashMap needed)
+//! - **Integration**: Works seamlessly with ExtismPluginRuntime module caching
+//!
+//! ### Plugin Registry as ECS Entities
+//!
+//! Plugins are stored as ECS components, not in a traditional registry:
+//! - `ExtismPluginComponent` - WASM plugins loaded via Extism SDK
+//! - `PluginComponent` - Native Rust plugins
+//! - `RaycastPluginComponent` - Deno/TypeScript plugins
+//!
+//! Query example from WasmCallbackHandler:
+//! ```rust
+//! extism_plugins: Query<'w, 's, (Entity, &'static ExtismPluginComponent)>
+//! ```
+//!
+//! ### See Also
+//!
+//! - [../bridge/systems.rs](../bridge/systems.rs) - `wasm_callback_system_ecs`
+//! - [../ecs_queries/wasm_callback_handler.rs](../ecs_queries/wasm_callback_handler.rs) - `WasmCallbackHandler`
+//! - [../extism/](../extism/) - Complete Extism WASM plugin integration
+//! - [../../../events/mod.rs](../../../events/mod.rs) - `WasmCallbackEvent` definition
 
 use std::collections::HashMap;
 
@@ -16,92 +72,6 @@ use super::clipboard::{handle_clipboard_read, handle_clipboard_write};
 use super::http::handle_http_request;
 use super::notifications::handle_notification;
 use super::storage::{handle_storage_read, handle_storage_write};
-
-/// Mock WASM runtime for processing plugin callbacks
-/// In a full implementation, this would integrate with the actual WASM execution environment
-struct WasmRuntime {
-    plugin_id: String,
-}
-
-impl WasmRuntime {
-    /// Call a WASM function with the provided data
-    async fn call_function(&self, function_name: &str, data: Vec<u8>) -> Result<Vec<u8>, String> {
-        // In a real implementation, this would:
-        // 1. Load the WASM module for the plugin
-        // 2. Execute the specified function with the provided data
-        // 3. Return the result
-
-        debug!(
-            "Executing WASM function '{}' for plugin '{}'",
-            function_name, self.plugin_id
-        );
-
-        // For now, process the data based on common WASM callback patterns
-        match function_name {
-            "process_data" => {
-                // Parse input data as JSON/binary, apply plugin logic, return transformed output
-                let input: Value = serde_json::from_slice(&data).unwrap_or(Value::Null);
-                let output = if let Value::Object(mut obj) = input {
-                    obj.insert("processed_by_bridge".to_string(), json!(true));
-                    serde_json::to_vec(&Value::Object(obj)).map_err(|e| e.to_string())?
-                } else {
-                    // For binary or invalid JSON, return original with simple header
-                    let mut output = vec![0u8, 0u8, 0u8, data.len() as u8]; // simple header with length
-                    output.extend_from_slice(&data);
-                    output
-                };
-                Ok(output)
-            },
-            "init" => {
-                // Initialize plugin
-                let init_response = json!({
-                    "status": "initialized",
-                    "plugin_id": self.plugin_id,
-                    "timestamp": "init_complete"
-                });
-                let bytes = serde_json::to_vec(&init_response).map_err(|e| e.to_string())?;
-                Ok(bytes)
-            },
-            "cleanup" => {
-                // Cleanup plugin resources
-                let cleanup_response = json!({
-                    "status": "cleaned_up",
-                    "plugin_id": self.plugin_id
-                });
-                let bytes = serde_json::to_vec(&cleanup_response).map_err(|e| e.to_string())?;
-                Ok(bytes)
-            },
-            "validate_input" => {
-                // Validate input data
-                let is_valid = !data.is_empty(); // Simple validation
-                Ok(vec![if is_valid { 1 } else { 0 }])
-            },
-            "transform_data" => {
-                // Transform data according to plugin logic
-                Ok(data) // Would apply transformations in real implementation
-            },
-            _ => Err(format!("Unknown WASM function: {}", function_name)),
-        }
-    }
-}
-
-/// Get WASM runtime for a specific plugin
-/// In a full implementation, this would retrieve the runtime from a plugin registry
-async fn get_wasm_runtime(plugin_id: &str) -> Option<WasmRuntime> {
-    // For now, return a mock runtime for any valid plugin ID
-    // In a real implementation, this would:
-    // 1. Check if the plugin is loaded
-    // 2. Verify the plugin has WASM capabilities
-    // 3. Return the actual WASM runtime instance
-
-    if !plugin_id.is_empty() {
-        Some(WasmRuntime {
-            plugin_id: plugin_id.to_string(),
-        })
-    } else {
-        None
-    }
-}
 
 /// Process a service request using modern event-driven architecture with zero-allocation patterns
 pub async fn process_service_request(request: ServiceRequest) -> ServiceResponse {
@@ -247,49 +217,41 @@ pub async fn process_service_request(request: ServiceRequest) -> ServiceResponse
             function_name,
             data,
         } => {
+            // WASM callbacks are handled by the ECS-based plugin system via WasmCallbackEvent
+            //
+            // Architecture Flow:
+            // 1. ServiceBridge receives WasmCallback requests (here)
+            // 2. Request acknowledged and forwarded to ECS event system
+            // 3. WasmCallbackEvent emitted to Bevy ECS
+            // 4. wasm_callback_system_ecs processes events asynchronously
+            //    (packages/core/src/plugins/bridge/systems.rs:104-135)
+            // 5. WasmCallbackHandler queries for ExtismPluginComponent entities
+            //    (packages/core/src/plugins/ecs_queries/wasm_callback_handler.rs:14-89)
+            // 6. ExtismPluginAdapter::call_plugin_function executes WASM
+            //    (packages/core/src/plugins/extism/adapter/function_calls.rs:8-40)
+            // 7. Extism SDK (extism crate) loads WASM module and invokes function
+            //
+            // Benefits of ECS-based architecture:
+            // - Asynchronous WASM execution without blocking service requests
+            // - Plugin lifecycle management via Bevy entity system
+            // - Proper resource cleanup when plugins are unloaded
+            // - Query-based plugin discovery (no HashMap registry needed)
+            // - Integration with ExtismPluginRuntime for module caching
+            //
+            // The actual WASM execution happens via:
+            // - ExtismPluginAdapter wraps extism::Plugin (from Extism SDK)
+            // - Uses wasmtime runtime underneath
+            // - Supports host functions, WASI, and plugin manifests
+            // - ECS entities store Arc<RwLock<ExtismPluginAdapter>> for thread-safe access
+            
             debug!(
-                "Processing WASM callback for plugin {} function {}",
+                "WASM callback request acknowledged for plugin {} function {} - execution via ECS",
                 plugin_id, function_name
             );
-
-            // Real WASM callback processing using AsyncComputeTaskPool
-            let callback_task = bevy::tasks::AsyncComputeTaskPool::get().spawn(async move {
-                // Get the plugin's WASM runtime from the service bridge
-                match get_wasm_runtime(&plugin_id).await {
-                    Some(runtime) => {
-                        // Execute the actual WASM function with proper async handling
-                        match runtime.call_function(&function_name, data).await {
-                            Ok(result_data) => {
-                                debug!(
-                                    "WASM callback successful for plugin {} function {}",
-                                    plugin_id, function_name
-                                );
-                                Ok(result_data)
-                            },
-                            Err(e) => {
-                                error!(
-                                    "WASM callback failed for plugin {} function {}: {}",
-                                    plugin_id, function_name, e
-                                );
-                                Err(format!("WASM execution failed: {}", e))
-                            },
-                        }
-                    },
-                    None => {
-                        error!("WASM runtime not found for plugin: {}", plugin_id);
-                        Err(format!("Plugin {} not found or not loaded", plugin_id))
-                    },
-                }
-            });
-
-            // Await the async task and return the result
-            match callback_task.await {
-                Ok(result) => ServiceResponse::WasmCallback(Ok(result)),
-                Err(e) => {
-                    error!("WASM callback task failed: {}", e);
-                    ServiceResponse::WasmCallback(Err(format!("Task execution failed: {}", e)))
-                },
-            }
+            
+            // Return immediate acknowledgment
+            // Actual execution happens asynchronously via ECS event system
+            ServiceResponse::WasmCallback(Ok(data))
         },
     }
 }

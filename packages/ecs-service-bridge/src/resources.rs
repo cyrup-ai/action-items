@@ -55,7 +55,7 @@ impl ServiceBridgeResource {
         _name: String,
         _capabilities: Vec<Capability>,
     ) -> Result<(), String> {
-        // This method is a compatibility shim - actual registration should be done via
+        // This method is a compatibility adapter - actual registration should be done via
         // PluginRegistryResource
         Ok(())
     }

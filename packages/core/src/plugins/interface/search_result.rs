@@ -1,11 +1,11 @@
-//! Search result type for backward compatibility
+//! Search result type alias
 //!
 //! This module provides a type alias for `SearchResult` that points to `ActionItem`.
-//! It's maintained for backward compatibility with existing code.
+//! Provides domain-specific naming for search contexts.
 
 use super::ActionItem;
 
-/// Alias for `ActionItem` to maintain backward compatibility
+/// Alias for `ActionItem` for search-specific contexts
 ///
-/// Use `ActionItem` instead.
+/// Prefer `ActionItem` in new code for consistency.
 pub type SearchResult = ActionItem;

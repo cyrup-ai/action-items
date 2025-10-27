@@ -12,7 +12,7 @@ pub mod scanning;
 pub mod types;
 pub mod wrapper_creation;
 
-// Re-export main types and functions for backward compatibility
+// Public API re-exports
 pub use logging::log_loaded_plugins;
 pub use orchestration::discover_plugin_wrappers;
 pub use types::{DiscoveredPlugin, DiscoveryConfig};

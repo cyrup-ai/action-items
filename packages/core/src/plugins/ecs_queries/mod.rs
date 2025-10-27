@@ -11,7 +11,7 @@ pub mod searcher;
 pub mod systems;
 pub mod wasm_callback_handler;
 
-// Re-export for backward compatibility
+// Public API re-exports
 pub use counter::{PluginCounter as Counter, PluginCounter, PluginType, PluginTypeDistribution};
 pub use executor::scheduler::PluginExecutor as Executor;
 pub use executor::{ExecutionResult, PluginExecutor};

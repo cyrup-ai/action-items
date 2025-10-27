@@ -11,6 +11,10 @@ use ecs_service_bridge::resources::PluginInfo;
 use ecs_service_bridge::systems::plugin_management::PluginCapabilityIndex;
 use ecs_service_bridge::types::MessageAddress;
 use tracing::{debug, info, warn};
+use action_items_ecs_cache::{
+    CacheReadRequested, CacheReadCompleted,
+    CacheWriteRequested, CacheWriteCompleted
+};
 
 use crate::components::*;
 use crate::events::*;
@@ -35,12 +39,15 @@ impl Plugin for SearchAggregatorPlugin {
                 Update,
                 (
                     query_change_detection_system,
+                    handle_cache_results_system,
                     spawn_plugin_search_tasks_system,
                     handle_plugin_search_tasks_system,
                     aggregate_search_results_system,
                     search_timeout_system,
                     search_cancellation_system,
                     search_cleanup_system,
+                    cache_completed_searches_system,
+                    cache_write_cleanup_system,
                 )
                     .chain(),
             );
@@ -49,12 +56,11 @@ impl Plugin for SearchAggregatorPlugin {
 /// System to detect query changes and initiate new searches
 fn query_change_detection_system(
     current_query: Res<CurrentQuery>,
-    mut search_events: EventWriter<SearchRequested>,
     mut cancel_events: EventWriter<SearchCancelled>,
+    mut cache_read_events: EventWriter<CacheReadRequested>,
     mut search_aggregator: ResMut<SearchAggregator>,
     mut aggregated_results: ResMut<AggregatedSearchResults>,
     search_config: Res<SearchConfig>,
-    capability_index: Res<PluginCapabilityIndex>,
 ) {
     // Only trigger on actual query changes
     if !current_query.is_changed() {
@@ -86,34 +92,103 @@ fn query_change_detection_system(
     }
     search_aggregator.active_searches.clear();
 
-    // Find plugins with search capability via service bridge integration
-    let search_capable_plugins: Vec<String> = discover_search_capable_plugins(&capability_index);
+    // Check cache FIRST before executing expensive multi-plugin search
+    debug!("Checking cache for query: '{}'", query);
+    cache_read_events.write(CacheReadRequested::new(
+        "search_results",
+        query.clone(),
+        "search_aggregator"
+    ));
 
-    if search_capable_plugins.is_empty() {
-        debug!("No search-capable plugins found");
-        return;
-    }
-
-    // Create and send search request event
-    let search_request = SearchRequested::new(query.clone(), search_capable_plugins.clone());
-    let search_id = search_request.search_id;
-
-    // Track this search
-    let expected_plugins: HashSet<String> = search_capable_plugins.into_iter().collect();
-    let active_search = ActiveSearch::new(query, search_id, expected_plugins);
-    search_aggregator
-        .active_searches
-        .insert(search_id, active_search);
-
-    // Start loading state
-    aggregated_results.start_search(search_id);
-
-    info!(
-        "Starting search '{}' with ID {:?}",
-        current_query.0, search_id
-    );
-    search_events.write(search_request);
+    // Note: Actual search spawning deferred to handle_cache_results_system
+    // If cache misses, that system will emit SearchRequested event
 }
+
+/// Handle cache read responses - display cached results or trigger search on miss
+fn handle_cache_results_system(
+    mut cache_responses: EventReader<CacheReadCompleted>,
+    mut search_events: EventWriter<SearchRequested>,
+    mut search_aggregator: ResMut<SearchAggregator>,
+    mut aggregated_results: ResMut<AggregatedSearchResults>,
+    capability_index: Res<PluginCapabilityIndex>,
+) {
+    for cache_response in cache_responses.read() {
+        // Filter: only handle search_results partition from search_aggregator
+        if cache_response.partition != "search_results" 
+            || cache_response.requester != "search_aggregator" {
+            continue;
+        }
+
+        let query = cache_response.key.clone();
+
+        // Try to get cached results (None if cache miss OR deserialization error)
+        let cached_results: Option<Vec<SearchResult>> = match &cache_response.result {
+            Ok(Some(cached_bytes)) => {
+                match serde_json::from_slice::<Vec<SearchResult>>(cached_bytes) {
+                    Ok(results) => {
+                        info!(
+                            "Cache HIT for '{}': {} results (instant display)",
+                            query, results.len()
+                        );
+                        Some(results)
+                    }
+                    Err(e) => {
+                        warn!("Cache deserialization failed for '{}': {}", query, e);
+                        None // Treat as cache miss
+                    }
+                }
+            }
+            Ok(None) => {
+                info!("Cache MISS for '{}' (key not found)", query);
+                None
+            }
+            Err(e) => {
+                warn!("Cache read error for '{}': {:?}", query, e);
+                None
+            }
+        };
+
+        // If we got cached results, display them immediately
+        if let Some(results) = cached_results {
+            let search_id = uuid::Uuid::new_v4();
+            aggregated_results.results = results;
+            aggregated_results.search_id = Some(search_id);
+            aggregated_results.is_loading = false;
+            aggregated_results.total_execution_time_ms = 0; // Instant
+            debug!("Cached results displayed for: '{}'", query);
+        } else {
+            // No cached results (cache miss, deserialization error, or read error)
+            // Trigger normal multi-plugin search
+            info!("Executing plugin search for '{}'", query);
+
+            let search_capable_plugins = discover_search_capable_plugins(&capability_index);
+            if search_capable_plugins.is_empty() {
+                debug!("No search-capable plugins available");
+                continue; // Use continue instead of return to process other responses
+            }
+
+            let search_request = SearchRequested::new(
+                query.clone(),
+                search_capable_plugins.clone()
+            );
+            let search_id = search_request.search_id;
+
+            let expected_plugins: HashSet<String> = 
+                search_capable_plugins.into_iter().collect();
+            let active_search = ActiveSearch::new(
+                query.clone(),
+                search_id,
+                expected_plugins
+            );
+            search_aggregator.active_searches.insert(search_id, active_search);
+            aggregated_results.start_search(search_id);
+
+            info!("Starting search '{}' with ID {:?}", query, search_id);
+            search_events.write(search_request);
+        }
+    }
+}
+
 /// System to spawn async search tasks for each capable plugin
 fn spawn_plugin_search_tasks_system(
     mut commands: Commands,
@@ -408,7 +483,6 @@ fn search_cancellation_system(
 /// System to cleanup completed searches
 fn search_cleanup_system(
     mut completion_events: EventReader<SearchCompleted>,
-    mut search_aggregator: ResMut<SearchAggregator>,
     mut aggregated_results: ResMut<AggregatedSearchResults>,
 ) {
     for completion_event in completion_events.read() {
@@ -428,11 +502,89 @@ fn search_cleanup_system(
             aggregated_results.finish_search(completion_event.execution_time_ms);
         }
 
-        // Clean up the active search after a delay to allow for any final processing
-        // In a real implementation, you might want to keep recent searches for caching
-        search_aggregator.active_searches.remove(&search_id);
+        // Keep search in active_searches for cache writing system
+        // Cleanup happens after cache write completes
+        debug!("Search {:?} completed - ready for caching", search_id);
+    }
+}
 
-        debug!("Cleaned up search {:?}", search_id);
+/// Write completed search results to cache for future reuse
+fn cache_completed_searches_system(
+    mut completion_events: EventReader<SearchCompleted>,
+    mut cache_write_events: EventWriter<CacheWriteRequested>,
+    search_aggregator: Res<SearchAggregator>,
+) {
+    for completion_event in completion_events.read() {
+        let search_id = completion_event.search_id;
+
+        // Retrieve active search data
+        if let Some(active_search) = search_aggregator.active_searches.get(&search_id) {
+            let query = active_search.query.clone();
+            let results = active_search.results.clone();
+
+            // Skip caching empty results (no value in caching misses)
+            if results.is_empty() {
+                debug!("Skipping cache - no results for '{}'", query);
+                continue;
+            }
+
+            // Serialize results
+            match serde_json::to_vec(&results) {
+                Ok(serialized) => {
+                    debug!(
+                        "Caching {} results for '{}' ({} bytes, TTL=1h)",
+                        results.len(),
+                        query,
+                        serialized.len()
+                    );
+
+                    cache_write_events.write(CacheWriteRequested::new(
+                        "search_results",
+                        query,
+                        serialized,
+                        Some(3600), // 1 hour TTL
+                        "search_aggregator"
+                    ));
+                }
+                Err(e) => {
+                    warn!("Failed to serialize results for '{}': {}", query, e);
+                }
+            }
+        }
+    }
+}
+
+/// Clean up active searches after cache write completes
+fn cache_write_cleanup_system(
+    mut cache_write_responses: EventReader<CacheWriteCompleted>,
+    mut search_aggregator: ResMut<SearchAggregator>,
+) {
+    for cache_response in cache_write_responses.read() {
+        // Filter: only handle our requests
+        if cache_response.partition != "search_results" 
+            || cache_response.requester != "search_aggregator" {
+            continue;
+        }
+
+        let query = cache_response.key.clone();
+
+        match &cache_response.result {
+            Ok(()) => {
+                debug!("Cache write successful for: '{}'", query);
+
+                // Now safe to remove completed searches matching this query
+                search_aggregator.active_searches.retain(|_id, search| {
+                    search.query != query
+                });
+            }
+            Err(e) => {
+                warn!("Cache write failed for '{}': {:?}", query, e);
+                // Clean up anyway to prevent memory leak
+                search_aggregator.active_searches.retain(|_id, search| {
+                    search.query != query
+                });
+            }
+        }
     }
 }
 

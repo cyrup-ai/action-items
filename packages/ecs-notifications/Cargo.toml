@@ -17,6 +17,8 @@ url = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 regex = "1"
 chrono = { version = "0.4", features = ["serde"] }
+ammonia = "4.0"  # HTML sanitization with whitelist approach
+pulldown-cmark = "0.12"  # CommonMark parser for safe Markdown processing
 
 # macOS specific
 [target.'cfg(target_os = "macos")'.dependencies]

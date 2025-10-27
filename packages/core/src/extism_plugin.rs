@@ -1,7 +1,6 @@
-//! Backward compatibility wrapper for extism_plugin
+//! Public API for extism plugin functionality
 //!
-//! This module re-exports the new modular extism plugin functionality
-//! for backward compatibility.
+//! Re-exports from modularized implementation for cleaner public interface.
 
-// Re-export all extism plugin functionality from the new location
+// Public API re-exports
 pub use crate::plugins::extism::*;

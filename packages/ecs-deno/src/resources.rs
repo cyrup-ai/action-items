@@ -21,6 +21,9 @@ use deno_web;
 use deno_webidl;
 use deno_core::v8;
 
+use serde_v8::from_v8;
+use serde_json;
+
 /// Sandbox permissions for controlling Deno web API access
 /// Based on working pattern from /tmp/deno/ext/web/benches/timers_ops.rs
 #[derive(Debug, Clone, Default)]
@@ -388,11 +391,32 @@ impl DenoRuntimePool {
             Ok(result) => {
                 // Run the event loop to handle any async operations
                 match runtime.resolve(result).await {
-                    Ok(_global_value) => {
-                        // TODO: Convert the Global<Value> to a string representation
-                        // The API for accessing v8 values from Global<Value> has changed in newer deno_core
-                        // For now, return success without the actual result value
-                        Ok("Script executed successfully".to_string())
+                    Ok(global_value) => {
+                        // Use deno_core scope! macro to create v8 scope (replaces deprecated handle_scope())
+                        deno_core::scope!(scope, &mut runtime);
+                        let local = v8::Local::new(scope, global_value);
+
+                        // Serialize using serde_v8 for robust JavaScript type handling
+                        let v8_val: serde_v8::Value = match from_v8(scope, local) {
+                            Ok(val) => val,
+                            Err(_) => {
+                                // Fallback to v8 JSON stringify on serialization error (e.g., circular references)
+                                match v8::json::stringify(scope, local) {
+                                    Some(json_str) => {
+                                        return Ok(json_str.to_rust_string_lossy(scope));
+                                    }
+                                    None => {
+                                        return Err("Failed to serialize script result to JSON".to_string());
+                                    }
+                                }
+                            }
+                        };
+
+                        // Convert to JSON string
+                        let json_value = serde_json::to_string(&v8_val.to_json())
+                            .map_err(|e| format!("JSON serialization error: {}", e))?;
+
+                        Ok(json_value)
                     }
                     Err(e) => Err(format!("Script execution failed: {}", e)),
                 }

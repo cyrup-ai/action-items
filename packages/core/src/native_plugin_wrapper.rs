@@ -1,7 +1,6 @@
-//! Backward compatibility wrapper for native_plugin_wrapper
+//! Public API for native plugin wrapper functionality
 //!
-//! This module re-exports the new modular native plugin wrapper functionality
-//! for backward compatibility.
+//! Re-exports from modularized implementation for cleaner public interface.
 
-// Re-export all native plugin wrapper functionality from the new location
+// Public API re-exports
 pub use crate::plugins::native::wrapper::*;

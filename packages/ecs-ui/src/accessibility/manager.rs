@@ -15,6 +15,10 @@ pub struct AccessibilityManager {
     pub high_contrast: bool,
     /// Reduced motion preference (WCAG 2.3.3)
     pub reduced_motion: bool,
+    pub large_text: bool,
+    pub text_scale_factor: f32,
+    pub magnifier_active: bool,
+    pub narrator_active: bool,
     /// Current announcement queue for screen readers
     pub announcements: Vec<String>,
 }

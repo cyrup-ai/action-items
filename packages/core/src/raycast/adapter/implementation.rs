@@ -16,18 +16,18 @@ use crate::raycast::loader::RaycastExtension;
 pub struct RaycastAdapter {
     #[allow(dead_code)] // Used by create_wasm_wrapper when implemented
     deno_runtime_path: PathBuf,
-    #[allow(dead_code)] // Used by create_api_shim and WASM wrapper
-    raycast_api_shim_path: PathBuf,
+    #[allow(dead_code)] // Used by create_api_adapter and WASM wrapper
+    raycast_api_adapter_path: PathBuf,
 }
 
 impl RaycastAdapter {
     /// Create new Raycast adapter with runtime path
     pub fn new(runtime_path: PathBuf) -> Self {
-        let raycast_api_shim_path = runtime_path.join("raycast-api-shim.js");
+        let raycast_api_adapter_path = runtime_path.join("raycast-api-adapter.js");
 
         Self {
             deno_runtime_path: runtime_path,
-            raycast_api_shim_path,
+            raycast_api_adapter_path,
         }
     }
 

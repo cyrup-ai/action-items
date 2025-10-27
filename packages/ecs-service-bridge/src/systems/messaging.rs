@@ -556,6 +556,103 @@ fn apply_rate_limiting(
     }
 }
 
+/// Check if a plugin has permission to message a specific target plugin
+/// Uses capability metadata to validate allowed messaging targets
+/// This is the FIRST security-critical use of capability metadata in the codebase
+#[inline]
+fn check_inter_plugin_messaging_permission(
+    source_plugin: &PluginInfo,
+    target_plugin_id: &str,
+) -> bool {
+    // Find inter_plugin_messaging capability
+    let messaging_capability = source_plugin
+        .capabilities
+        .iter()
+        .find(|cap| cap.name == CAPABILITY_INTER_PLUGIN_MESSAGING);
+
+    let Some(capability) = messaging_capability else {
+        // Plugin doesn't have inter-plugin messaging capability at all
+        return false;
+    };
+
+    // Check allowed targets in metadata
+    if let Some(allowed_targets_str) = capability.metadata.get(METADATA_ALLOWED_TARGETS) {
+        // Parse allowed targets (comma-separated list)
+        let allowed_targets: Vec<&str> = allowed_targets_str
+            .split(',')
+            .map(|s| s.trim())
+            .collect();
+
+        // Check for wildcard (allow all)
+        if allowed_targets.contains(&"*") {
+            return true;
+        }
+
+        // Check if target is in allowed list
+        if allowed_targets.contains(&target_plugin_id) {
+            return true;
+        }
+
+        // Check for pattern matching (e.g., "system.*" matches "system.core")
+        for pattern in allowed_targets {
+            if pattern.ends_with(".*") {
+                let prefix = &pattern[..pattern.len() - 2];
+                if target_plugin_id.starts_with(prefix) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // If no allowed_targets specified, deny by default (secure by default)
+    false
+}
+
+/// Optional: Check if message type is allowed for this plugin
+/// Provides fine-grained control over what messages can be sent
+#[inline]
+fn check_message_type_permission(
+    source_plugin: &PluginInfo,
+    message_type: &str,
+    _target_plugin_id: &str,
+) -> bool {
+    // Find inter_plugin_messaging capability
+    let messaging_capability = source_plugin
+        .capabilities
+        .iter()
+        .find(|cap| cap.name == CAPABILITY_INTER_PLUGIN_MESSAGING);
+
+    let Some(capability) = messaging_capability else {
+        return false;
+    };
+
+    // Check allowed message types in metadata
+    if let Some(allowed_types_str) = capability.metadata.get(METADATA_ALLOWED_MESSAGE_TYPES) {
+        let allowed_types: Vec<&str> = allowed_types_str
+            .split(',')
+            .map(|s| s.trim())
+            .collect();
+
+        // Wildcard allows all message types
+        if allowed_types.contains(&"*") {
+            return true;
+        }
+
+        // Check if message type is allowed
+        if allowed_types.contains(&message_type) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // If no message type restrictions specified, allow all types
+    // (the capability itself is the permission gate)
+    true
+}
+
 /// Validate comprehensive plugin permissions for message content and routing
 /// Production implementation with real capability validation and security checks
 #[inline]
@@ -604,12 +701,37 @@ fn validate_plugin_permissions(
 
     // Check cross-plugin communication permissions
     if target_plugin_id != "system" && target_plugin_id != "broadcast" {
-        // In production, this would check a permission matrix
-        // For now, allow all registered plugins to communicate
+        // Verify target plugin exists
         if plugin_registry.get_plugin(target_plugin_id).is_none() {
             warn!(
                 "Message to unregistered plugin: {} -> {}",
                 plugin_id, target_plugin_id
+            );
+            return false;
+        }
+
+        // Check if source plugin has permission to message this target
+        if !check_inter_plugin_messaging_permission(source_plugin, target_plugin_id) {
+            warn!(
+                "Plugin '{}' not authorized to message plugin '{}'. Missing or insufficient '{}' capability.",
+                plugin_id,
+                target_plugin_id,
+                CAPABILITY_INTER_PLUGIN_MESSAGING
+            );
+            return false;
+        }
+
+        // Optional: Check message type permissions
+        if !check_message_type_permission(
+            source_plugin,
+            &envelope.metadata.message_type,
+            target_plugin_id,
+        ) {
+            warn!(
+                "Plugin '{}' not authorized to send message type '{}' to plugin '{}'",
+                plugin_id,
+                envelope.metadata.message_type,
+                target_plugin_id
             );
             return false;
         }

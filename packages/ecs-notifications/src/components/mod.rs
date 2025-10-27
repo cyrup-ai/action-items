@@ -450,6 +450,11 @@ pub enum NotificationError {
         limit: usize,
         requested: usize,
     },
+    /// Sanitization error (HTML/Markdown processing failed)
+    SanitizationError {
+        content_type: String,  // "html", "markdown", etc.
+        message: String,
+    },
 }
 
 impl std::fmt::Display for NotificationError {
@@ -510,6 +515,9 @@ impl std::fmt::Display for NotificationError {
                     "Resource exhausted: {} limit {} exceeded (requested {})",
                     resource_type, limit, requested
                 )
+            },
+            NotificationError::SanitizationError { content_type, message } => {
+                write!(f, "Sanitization error for {}: {}", content_type, message)
             },
         }
     }

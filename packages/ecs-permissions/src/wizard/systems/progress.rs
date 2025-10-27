@@ -241,12 +241,14 @@ pub fn update_wizard_progress(
                     }
                 },
                 WizardState::SettingUpHotkeys => {
-                    // Complete wizard when hotkeys are configured
-                    // For now, auto-complete after a brief delay
-                    step_complete_events.write(WizardStepComplete::new(
-                        WizardState::SettingUpHotkeys,
-                        WizardState::Complete,
-                    ));
+                    // Auto-advance to complete only if all required permissions granted
+                    // Hotkeys are optional - wizard can complete without them
+                    if tracker.all_required_permissions_granted() {
+                        step_complete_events.write(WizardStepComplete::new(
+                            WizardState::SettingUpHotkeys,
+                            WizardState::Complete,
+                        ));
+                    }
                 },
                 _ => {},
             }

@@ -1,7 +1,6 @@
-//! Backward compatibility wrapper for raycast_plugin_wrapper
+//! Public API for raycast plugin wrapper functionality
 //!
-//! This module re-exports the new modular raycast wrapper functionality
-//! for backward compatibility.
+//! Re-exports from modularized implementation for cleaner public interface.
 
-// Re-export all raycast plugin wrapper functionality from the new location
+// Public API re-exports
 pub use crate::raycast::wrapper::*;
