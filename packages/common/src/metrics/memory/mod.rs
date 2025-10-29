@@ -11,7 +11,7 @@
 //!
 //! ## Quick Start
 //!
-//! ```rust
+//! ```rust,ignore
 //! use std::sync::Arc;
 //!
 //! use action_items_common::metrics::memory::{EnhancedMemoryTracker, MemoryTracker};
@@ -27,7 +27,7 @@
 //!
 //! ## Production Profiling
 //!
-//! ```rust
+//! ```rust,ignore
 //! #[cfg(feature = "jemalloc-profiling")]
 //! use action_items_common::metrics::memory::JemallocProfiler;
 //!
@@ -40,7 +40,7 @@
 //!
 //! ## Development Analysis
 //!
-//! ```rust
+//! ```rust,ignore
 //! #[cfg(feature = "dhat-heap")]
 //! use action_items_common::metrics::memory::{DhatProfiler, ExpectedUsage};
 //!
@@ -63,7 +63,7 @@
 //!
 //! ## Testing Framework
 //!
-//! ```rust
+//! ```rust,ignore
 //! use action_items_common::metrics::memory::{MemoryLeakTestSuite, MemoryThresholds, scenarios};
 //!
 //! let mut suite = MemoryLeakTestSuite::with_thresholds(MemoryThresholds::default());

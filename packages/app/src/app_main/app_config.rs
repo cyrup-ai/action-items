@@ -31,6 +31,7 @@ use ecs_task_management::TaskManagementPlugin;
 use action_items_ecs_surrealdb::DatabasePlugin;
 use action_items_ecs_user_settings::UserSettingsPlugin;
 use ecs_tls::TlsCleanupPlugin;
+use bevy_tokio_tasks::TokioTasksPlugin;
 
 use crate::events::handlers::preferences::PendingFileOperations;
 use crate::events::PreferencesEvent;
@@ -151,6 +152,8 @@ pub fn configure_app() -> App {
     // Solid background color for visibility - no transparency issues
     .insert_resource(ClearColor(Color::srgb(0.05, 0.05, 0.08)))
     .insert_resource(UiScale(1.0))
+    // Tokio runtime integration - MUST BE FIRST before any plugin that uses Tokio
+    .add_plugins(TokioTasksPlugin::default())
     // Core service coordination - Service Bridge must be first
     .add_plugins(ServiceBridgePlugin)
     // Core application plugins

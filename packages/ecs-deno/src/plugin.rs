@@ -7,6 +7,7 @@
 //! - Zero-allocation optimizations for performance-critical paths
 
 use bevy::prelude::*;
+use bevy_tokio_tasks::TokioTasksRuntime;
 use std::time::Duration;
 
 use crate::events::*;
@@ -195,11 +196,17 @@ impl Plugin for DenoPlugin {
     fn build(&self, app: &mut App) {
         info!("Initializing ECS Deno Runtime Service Plugin");
 
+        // IMPORTANT: TokioTasksPlugin MUST be added before DenoPlugin
+        // Access the shared Tokio runtime
+        let tokio_runtime = app.world().resource::<TokioTasksRuntime>();
+        let tokio_handle = tokio_runtime.runtime().handle().clone();
+
         // Initialize resources
         app.insert_resource(DenoRuntimePool::new(
             self.max_runtimes,
             self.default_timeout,
             self.sandbox_config.clone().into(),
+            tokio_handle,
         ))
         .insert_resource(DenoOperationTracker::default())
         .insert_resource(ExtensionDiscoveryManager::new(self.enable_discovery))

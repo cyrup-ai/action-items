@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use bevy::prelude::*;
+use bevy_tokio_tasks::TokioTasksRuntime;
 use log::{debug, info};
 
 use crate::discovery::core::types::MetadataProvider;
@@ -94,8 +95,13 @@ impl Plugin for RaycastPluginWrapper {
         let metadata = self.metadata.clone();
         let extension = self.extension.clone();
         
-        // Use startup system to spawn entity instead of direct world spawning
-        app.add_systems(Startup, move |mut commands: Commands| {
+        // Use startup system to spawn entity with Tokio runtime handle
+        app.add_systems(Startup, move |
+            mut commands: Commands,
+            tokio_runtime: Res<TokioTasksRuntime>
+        | {
+            let handle = tokio_runtime.runtime().handle().clone();
+            
             commands.spawn(RaycastPluginComponent {
                 id: metadata.id.clone(),
                 name: metadata.name.clone(),
@@ -107,6 +113,7 @@ impl Plugin for RaycastPluginWrapper {
                     .map(|cmd| cmd.name.clone())
                     .collect(),
                 extension: extension.clone(),
+                tokio_handle: handle,
             });
         });
 
@@ -161,6 +168,8 @@ pub struct RaycastPluginComponent {
     pub path: PathBuf,
     pub commands: Vec<String>,
     pub extension: RaycastExtension,
+    /// Shared Tokio runtime handle for async operations
+    pub tokio_handle: tokio::runtime::Handle,
 }
 
 impl RaycastPluginComponent {
@@ -196,14 +205,11 @@ impl RaycastPluginComponent {
             // execution capability
             let plugin_id = format!("raycast_{}", self.name);
 
-            // Create a simple async runtime for this execution
+            // Use shared Tokio runtime instead of creating ephemeral runtime
             // This maintains synchronous interface compatibility while using proper async execution
-            // internally
-            let rt = tokio::runtime::Runtime::new().map_err(|e| {
-                crate::Error::PluginError(format!("Failed to create runtime: {}", e))
-            })?;
-
-            rt.block_on(async { runtime.execute_plugin(&plugin_id, &source_code).await })
+            // internally via the shared runtime provided by TokioTasksPlugin
+            self.tokio_handle
+                .block_on(async { runtime.execute_plugin(&plugin_id, &source_code).await })
                 .map_err(|e| {
                     crate::Error::PluginError(format!("Plugin execution failed: {}", e))
                 })?;

@@ -11,7 +11,7 @@ use std::time::Duration;
 // pub use database::{DatabaseConfig, DatabaseError, DatabaseService};  // Disabled due to
 // missing dependency
 pub use notification::NotificationService;
-pub use storage::StorageService;
+pub use storage::{initialize_storage_system, StorageService};
 
 #[derive(bevy::prelude::Resource)]
 /// Resource for managing plugin storage directories

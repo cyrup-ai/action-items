@@ -69,6 +69,9 @@ impl Plugin for ActionItemsCorePlugin {
         }
         app.insert_resource(app_directories);
 
+        // Initialize global storage service
+        app.add_systems(Startup, crate::plugins::services::storage::initialize_storage_system);
+
         // Add complete ECS services in dependency order
         // Note: SearchAggregatorPlugin is added by main app to avoid duplicate registration
 

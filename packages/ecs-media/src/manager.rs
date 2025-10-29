@@ -124,21 +124,17 @@ impl MediaManager {
             });
         }
         
-        // Generate thumbnail and extract dimensions for images
-        let (thumbnail_path, width, height) = if mime_type.starts_with("image/") {
-            match self.generate_thumbnail(&storage_path, &media_id).await {
-                Ok((thumb_path, w, h)) => (Some(thumb_path), Some(w), Some(h)),
-                Err(e) => {
-                    // Log warning but don't fail upload
-                    eprintln!("Failed to generate thumbnail for {}: {}", media_id.0, e);
-                    (None, None, None)
-                }
+        // Extract dimensions for images (header-only, fast)
+        let (width, height) = if mime_type.starts_with("image/") {
+            match image::image_dimensions(&storage_path) {
+                Ok((w, h)) => (Some(w), Some(h)),
+                Err(_) => (None, None)
             }
         } else {
-            (None, None, None)
+            (None, None)
         };
         
-        // Create media record with thumbnail and dimensions
+        // Create media record
         let media = Media {
             id: media_id,
             user_id,
@@ -148,10 +144,10 @@ impl MediaManager {
             size_bytes,
             width,
             height,
-            duration_seconds: None,  // Video duration extraction is out of scope
+            duration_seconds: None,
             description,
             storage_path: storage_path.to_string_lossy().into_owned(),
-            thumbnail_path,
+            thumbnail_path: None,  // No thumbnail in MEDIA_B (that's MEDIA_C)
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };

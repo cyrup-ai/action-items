@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bevy::prelude::*;
+use bevy_tokio_tasks::TokioTasksRuntime;
 use log::{error, info};
 
 use crate::raycast::adapter::RaycastAdapter;
@@ -36,6 +37,7 @@ pub fn discover_raycast_extensions(
     mut raycast_manager: ResMut<RaycastManager>,
     mut commands: Commands,
     mut search_index: Option<ResMut<SearchIndex>>,
+    tokio_runtime: Res<TokioTasksRuntime>,
 ) {
     // Initialize Raycast loader (clone repo if needed)
     if !raycast_manager.initialized {
@@ -52,6 +54,9 @@ pub fn discover_raycast_extensions(
         }
     }
 
+    // Get Tokio runtime handle for component construction
+    let handle = tokio_runtime.runtime().handle().clone();
+    
     // List all available Raycast extensions
     match raycast_manager.loader.list_extensions() {
         Ok(extensions) => {
@@ -75,6 +80,7 @@ pub fn discover_raycast_extensions(
                             path: wrapper.metadata().path.clone(),
                             commands: wrapper.metadata().commands.clone(),
                             extension: extension.clone(),
+                            tokio_handle: handle.clone(),
                         });
 
                         // 2. Add items to SearchIndex if available

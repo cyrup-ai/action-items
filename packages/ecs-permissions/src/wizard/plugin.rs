@@ -59,6 +59,7 @@ use crate::wizard::{
 use crate::wizard::first_run::{
     // First-run system function imports
     initiate_first_run_check, handle_wizard_completion, check_should_start_wizard,
+    handle_wizard_start_request,
 };
 use crate::wizard::ui::theme::{
     WizardTheme, ThemeAnimationState, ThemePresetChangeEvent,
@@ -429,7 +430,9 @@ impl Plugin for PermissionWizardPlugin {
                     initiate_first_run_check,
                     check_first_run_and_auto_start,
                     check_should_start_wizard,
+                    handle_wizard_start_request,
                 )
+                    .chain()
                     .in_set(WizardCheckSet)
                     .run_if(not(wizard_active))
             );

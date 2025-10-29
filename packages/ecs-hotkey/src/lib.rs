@@ -46,6 +46,8 @@ pub mod system_hotkeys;
 use std::time::Duration;
 
 use bevy::prelude::*;
+#[cfg(target_os = "linux")]
+use bevy_tokio_tasks::TokioTasksRuntime;
 pub use capture::*;
 pub use components::*;
 pub use conflict::*;
@@ -155,39 +157,53 @@ impl Plugin for HotkeyPlugin {
                     match compositor {
                         crate::platform::LinuxCompositor::Kde |
                         crate::platform::LinuxCompositor::Hyprland => {
-                            // Try initializing Wayland backend
-                            let wayland_result = tokio::runtime::Runtime::new()
-                                .map_err(|e| format!("Failed to create tokio runtime: {}", e))
-                                .and_then(|rt| {
-                                    rt.block_on(async {
-                                        crate::platform::linux_wayland::WaylandHotkeyManager::new().await
-                                            .map_err(|e| format!("Wayland backend init failed: {}", e))
-                                    })
-                                });
-
-                            match wayland_result {
-                                Ok(wayland_mgr) => {
-                                    info!("✅ Wayland native hotkey support initialized");
-                                    match GlobalHotKeyManager::new() {
-                                        Ok(global_manager) => {
-                                            Some(HotkeyManager {
-                                                global_manager,
-                                                max_hotkeys: self.max_hotkeys,
-                                                enable_conflict_resolution: self.enable_conflict_resolution,
-                                                wayland_manager: Some(std::sync::Arc::new(tokio::sync::Mutex::new(wayland_mgr))),
-                                            })
+                            // Access shared Tokio runtime from app world
+                            if let Some(tokio_runtime) = app.world().get_resource::<TokioTasksRuntime>() {
+                                let tokio_runtime = tokio_runtime.clone();
+                                let max_hotkeys = self.max_hotkeys;
+                                let enable_conflict_resolution = self.enable_conflict_resolution;
+                                
+                                // Spawn background task for Wayland initialization
+                                tokio_runtime.spawn_background_task(|mut ctx| async move {
+                                    match crate::platform::linux_wayland::WaylandHotkeyManager::new().await {
+                                        Ok(wayland_mgr) => {
+                                            info!("✅ Wayland native hotkey support initialized");
+                                            
+                                            // Insert HotkeyManager on main thread
+                                            ctx.run_on_main_thread(move |ctx| {
+                                                match GlobalHotKeyManager::new() {
+                                                    Ok(global_manager) => {
+                                                        let hotkey_manager = HotkeyManager {
+                                                            global_manager,
+                                                            max_hotkeys,
+                                                            enable_conflict_resolution,
+                                                            wayland_manager: Some(std::sync::Arc::new(tokio::sync::Mutex::new(wayland_mgr))),
+                                                        };
+                                                        ctx.world_mut().insert_resource(hotkey_manager);
+                                                        info!("HotkeyManager with Wayland support inserted");
+                                                    }
+                                                    Err(e) => {
+                                                        error!("GlobalHotKeyManager creation failed: {}", e);
+                                                    }
+                                                }
+                                            }).await;
                                         }
                                         Err(e) => {
-                                            error!("GlobalHotKeyManager creation failed: {}", e);
-                                            error!("Hotkey functionality will be disabled for this session");
-                                            None
+                                            error!("Wayland backend initialization failed: {}, falling back to X11", e);
+                                            
+                                            // Fall back to X11 on main thread
+                                            ctx.run_on_main_thread(move |ctx| {
+                                                if let Ok(hotkey_manager) = HotkeyManager::new(max_hotkeys, enable_conflict_resolution) {
+                                                    ctx.world_mut().insert_resource(hotkey_manager);
+                                                }
+                                            }).await;
                                         }
                                     }
-                                }
-                                Err(e) => {
-                                    error!("Wayland backend initialization failed: {}, falling back to X11", e);
-                                    HotkeyManager::new(self.max_hotkeys, self.enable_conflict_resolution).ok()
-                                }
+                                });
+                                None // Return None since initialization is async
+                            } else {
+                                error!("TokioTasksRuntime not available - is TokioTasksPlugin registered before HotkeyPlugin?");
+                                None
                             }
                         }
                         _ => {

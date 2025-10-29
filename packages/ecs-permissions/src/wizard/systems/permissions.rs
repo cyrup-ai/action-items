@@ -499,6 +499,7 @@ pub fn handle_wizard_permission_checks(
     _permission_requests: EventWriter<PermissionRequest>,
     mut wizard_permission_manager: ResMut<WizardPermissionManager>,
     _permission_resource: Res<PermissionResource>,
+    mut status_changed_events: EventWriter<WizardPermissionStatusChanged>,
 ) {
     for batch_check in batch_check_events.read() {
         if !wizard_permission_manager.can_batch_check() && !batch_check.force_refresh {
@@ -527,7 +528,26 @@ pub fn handle_wizard_permission_checks(
                 Ok(status) => status,
                 Err(_) => PermissionStatus::Denied,
             };
+
+            // Get previous status before updating cache
+            let previous_status = wizard_permission_manager
+                .get_cached_status(permission_type)
+                .unwrap_or(PermissionStatus::Unknown);
+
+            // Update cache
             wizard_permission_manager.update_cache(permission_type, wizard_status);
+
+            // Send status change event to notify progress tracker
+            if previous_status != wizard_status {
+                status_changed_events.write(WizardPermissionStatusChanged {
+                    permission_type,
+                    previous_status,
+                    new_status: wizard_status,
+                    affects_progress: wizard_permission_manager
+                        .required_permissions
+                        .contains(&permission_type),
+                });
+            }
         }
     }
 }

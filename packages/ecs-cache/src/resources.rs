@@ -24,25 +24,17 @@ impl CacheManager {
         }
     }
 
-    pub async fn create_partition(
+    /// Insert a completed cache partition
+    ///
+    /// Called by the system that polls cache initialization responses from the Tokio bridge.
+    pub fn insert_partition(
         &mut self,
-        name: impl Into<String>,
+        name: String,
+        cache: Goldylox<String, Vec<u8>>,
         config: CachePartitionConfig,
-    ) -> Result<(), String> {
-        let name = name.into();
-
-        // Create goldylox cache using builder pattern with proper configuration mapping
-        let cache = Goldylox::<String, Vec<u8>>::builder()
-            .hot_tier_max_entries(config.hot_tier_capacity as u32)
-            .warm_tier_max_entries(config.warm_tier_capacity)
-            .build()
-            .await
-            .map_err(|e| format!("Failed to create cache partition '{}': {:?}", name, e))?;
-
+    ) {
         self.partitions.insert(name.clone(), cache);
         self.partition_configs.insert(name, config);
-
-        Ok(())
     }
 
     pub fn get_partition(&self, name: &str) -> Option<&Goldylox<String, Vec<u8>>> {
@@ -232,3 +224,4 @@ pub struct GlobalCacheStats {
     pub total_entries: usize,
     pub uptime_seconds: u64,
 }
+

@@ -43,6 +43,6 @@ pub use performance::{
     PerformanceStatistics, TimingStatistics, PerformanceTrend,
 };
 
-// Legacy deno-ops functions are now internal-only - use ECS events for external API:
+// Direct deno-ops functions are internal-only - use ECS events for external API:
 // - ExtensionDiscoveryRequested -> ExtensionDiscoveryCompleted/Failed
 // - DenoScriptExecutionRequested -> DenoScriptExecutionCompleted/Failed

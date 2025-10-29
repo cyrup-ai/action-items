@@ -194,3 +194,19 @@ pub fn check_should_start_wizard(
         wizard_start_events.write(WizardStartRequest::new());
     }
 }
+
+/// System to handle wizard start requests and transition state
+pub fn handle_wizard_start_request(
+    mut start_events: EventReader<WizardStartRequest>,
+    mut next_state: ResMut<NextState<WizardState>>,
+    current_state: Res<State<WizardState>>,
+) {
+    for _event in start_events.read() {
+        if *current_state.get() == WizardState::NotStarted {
+            info!("Processing wizard start request - transitioning to Welcome");
+            next_state.set(WizardState::Welcome);
+            // Only process first event to avoid multiple transitions
+            break;
+        }
+    }
+}

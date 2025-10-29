@@ -13,6 +13,9 @@ impl Plugin for EcsCachePlugin {
     fn build(&self, app: &mut App) {
         info!("Initializing ECS Cache Plugin with goldylox backend");
 
+        // Note: TokioTasksPlugin MUST be added to the app before this plugin
+        // It provides the shared Tokio runtime used for goldylox initialization
+
         // Add resources
         app.init_resource::<CacheManager>()
             .init_resource::<CacheConfig>()
@@ -37,9 +40,6 @@ impl Plugin for EcsCachePlugin {
         app.add_systems(
             Update,
             (
-                // Initialization polling
-                handle_partition_init_system,
-                handle_partition_init_tasks,
                 // Request processing
                 process_cache_reads_system,
                 process_cache_writes_system,

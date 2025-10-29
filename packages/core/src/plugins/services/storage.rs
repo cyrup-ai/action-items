@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bevy::prelude::*;
+use bevy_tokio_tasks::TokioTasksRuntime;
 use serde_json::Value;
 use tokio::fs;
 use tokio::sync::RwLock;
@@ -46,49 +47,6 @@ impl StorageService {
             base_path: plugin_path,
             plugin_id,
         })
-    }
-
-    /// Get global storage service instance with thread-safe singleton pattern
-    pub fn global_instance() -> Result<Arc<RwLock<Self>>, Box<dyn std::error::Error + Send + Sync>>
-    {
-        use std::sync::OnceLock;
-
-        use tokio::runtime::Handle;
-
-        static INSTANCE: OnceLock<Arc<RwLock<StorageService>>> = OnceLock::new();
-
-        match INSTANCE.get() {
-            Some(instance) => Ok(instance.clone()),
-            None => {
-                let result = {
-                    let base_path = std::env::temp_dir().join("action_items_global_storage");
-
-                    // Try to use current tokio runtime, fallback to creating one
-                    let instance_result = if let Ok(handle) = Handle::try_current() {
-                        // Use existing runtime
-                        handle.block_on(async { Self::new(base_path, "global".to_string()).await })
-                    } else {
-                        // Create new runtime for initialization
-                        match tokio::runtime::Runtime::new() {
-                            Ok(rt) => rt.block_on(async {
-                                Self::new(base_path, "global".to_string()).await
-                            }),
-                            Err(e) => Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
-                        }
-                    };
-
-                    match instance_result {
-                        Ok(service) => Arc::new(RwLock::new(service)),
-                        Err(e) => return Err(e),
-                    }
-                };
-
-                INSTANCE
-                    .set(result.clone())
-                    .map_err(|_| "Failed to set global instance")?;
-                Ok(result)
-            },
-        }
     }
 
     async fn persist_data(&self) -> Result<(), String> {
@@ -180,4 +138,41 @@ impl StorageService {
     pub fn plugin_id(&self) -> &str {
         &self.plugin_id
     }
+}
+
+/// Initialize global storage service using shared Tokio runtime
+///
+/// This system runs at startup and creates the StorageService resource
+/// using the shared TokioTasksRuntime, avoiding the need to create
+/// a new runtime just for storage initialization.
+pub fn initialize_storage_system(
+    tokio_runtime: Res<TokioTasksRuntime>,
+) {
+    log::info!("Initializing global storage service using shared Tokio runtime");
+
+    // Use temp directory for global storage
+    let base_path = std::env::temp_dir().join("action_items_global_storage");
+    let plugin_id = "global".to_string();
+
+    // Spawn background task in shared Tokio runtime
+    tokio_runtime.spawn_background_task(|mut ctx| async move {
+        log::info!("Creating global storage service at path: {:?}", base_path);
+
+        match StorageService::new(base_path.clone(), plugin_id.clone()).await {
+            Ok(service) => {
+                log::info!("Successfully initialized global storage service");
+                
+                // Insert StorageService as a Bevy resource on the main thread
+                ctx.run_on_main_thread(move |ctx| {
+                    ctx.world.insert_resource(service);
+                    log::info!("StorageService resource registered in Bevy world");
+                }).await;
+            }
+            Err(e) => {
+                log::error!("Failed to initialize global storage service: {:?}", e);
+                // Note: App continues without storage service
+                // Individual plugins will need to handle missing storage gracefully
+            }
+        }
+    });
 }

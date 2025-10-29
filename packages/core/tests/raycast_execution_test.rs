@@ -17,6 +17,10 @@ mod tests {
 
     #[test]
     fn test_raycast_plugin_component_creation() {
+        // Create a Tokio runtime for the test
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create test runtime");
+        let handle = rt.handle().clone();
+        
         // Create a test Raycast extension
         let extension = RaycastExtension {
             id: "test-extension".to_string(),
@@ -42,6 +46,7 @@ mod tests {
             path: PathBuf::from("/tmp"),
             commands: vec!["test-command".to_string()],
             extension,
+            tokio_handle: handle,
         };
 
         // Verify component was created successfully
@@ -52,6 +57,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_raycast_command_execution() {
+        // Get current Tokio runtime handle (test is already async with #[tokio::test])
+        let handle = tokio::runtime::Handle::current();
+        
         // Create a test Raycast extension
         let extension = RaycastExtension {
             id: "test-extension".to_string(),
@@ -77,6 +85,7 @@ mod tests {
             path: PathBuf::from("/tmp"),
             commands: vec!["test-command".to_string()],
             extension,
+            tokio_handle: handle,
         };
 
         // Execute the command
@@ -90,6 +99,10 @@ mod tests {
 
     #[test]
     fn test_raycast_command_not_found() {
+        // Create a Tokio runtime for the test
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create test runtime");
+        let handle = rt.handle().clone();
+        
         // Create a test Raycast extension
         let extension = RaycastExtension {
             id: "test-extension".to_string(),
@@ -115,6 +128,7 @@ mod tests {
             path: PathBuf::from("/tmp"),
             commands: vec!["valid-command".to_string()],
             extension,
+            tokio_handle: handle,
         };
 
         // Try to execute a non-existent command

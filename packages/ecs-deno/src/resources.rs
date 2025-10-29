@@ -145,6 +145,8 @@ pub struct DenoRuntimePool {
     default_timeout: Duration,
     /// Sandbox configuration for security
     sandbox_config: SandboxConfiguration,
+    /// Shared Tokio runtime handle for all workers
+    tokio_handle: tokio::runtime::Handle,
     /// Pool creation timestamp
     created_at: Instant,
     /// Pool statistics
@@ -157,6 +159,7 @@ impl DenoRuntimePool {
         max_runtimes: usize,
         default_timeout: Duration,
         sandbox_config: SandboxConfiguration,
+        tokio_handle: tokio::runtime::Handle,
     ) -> Self {
         let pool_state = Arc::new(Mutex::new(PoolState {
             workers: Vec::new(),
@@ -169,6 +172,7 @@ impl DenoRuntimePool {
             max_runtimes,
             default_timeout,
             sandbox_config,
+            tokio_handle,
             created_at: Instant::now(),
             stats: Arc::new(Mutex::new(PoolStatistics::default())),
         };
@@ -206,11 +210,14 @@ impl DenoRuntimePool {
         let sandbox_config = self.sandbox_config.clone();
         let active_operations = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let active_operations_clone = active_operations.clone();
+        
+        // Clone the handle for the worker thread
+        let worker_tokio_handle = self.tokio_handle.clone();
 
         let thread_handle = std::thread::Builder::new()
             .name(format!("deno-worker-{}", worker_id))
             .spawn(move || {
-                Self::run_worker_thread(worker_id, worker_receiver, sandbox_config, active_operations_clone);
+                Self::run_worker_thread(worker_id, worker_receiver, sandbox_config, active_operations_clone, worker_tokio_handle);
             })?;
 
         let worker_info = WorkerInfo {
@@ -242,6 +249,7 @@ impl DenoRuntimePool {
         mut control_receiver: mpsc::UnboundedReceiver<WorkerControlMessage>,
         sandbox_config: SandboxConfiguration,
         active_operations: Arc<std::sync::atomic::AtomicUsize>,
+        tokio_handle: tokio::runtime::Handle,
     ) {
         info!("Starting Deno worker thread {}", worker_id);
         
@@ -255,16 +263,8 @@ impl DenoRuntimePool {
             }
         };
         
-        // Process control messages and execution requests
-        let rt = match tokio::runtime::Runtime::new() {
-            Ok(rt) => rt,
-            Err(e) => {
-                error!("Failed to create Tokio runtime for worker {}: {}", worker_id, e);
-                return;
-            }
-        };
-        
-        rt.block_on(async {
+        // Use shared Tokio runtime handle instead of creating new runtime
+        tokio_handle.block_on(async {
             while let Some(message) = control_receiver.recv().await {
                 match message {
                     WorkerControlMessage::Execute(request) => {

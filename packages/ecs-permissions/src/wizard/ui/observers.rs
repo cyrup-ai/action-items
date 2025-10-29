@@ -11,13 +11,22 @@ pub fn register_wizard_observers(
     mut commands: Commands,
 ) {
     // Register observers for wizard UI events
+    // Each Observer must be spawned separately
     commands.spawn((
         Observer::new(handle_wizard_button_click),
-        Observer::new(handle_permission_card_click),
-        Observer::new(handle_wizard_modal_close),
-        Name::new("WizardUIObservers"),
+        Name::new("WizardButtonClickObserver"),
     ));
-    
+
+    commands.spawn((
+        Observer::new(handle_permission_card_click),
+        Name::new("WizardPermissionCardClickObserver"),
+    ));
+
+    commands.spawn((
+        Observer::new(handle_wizard_modal_close),
+        Name::new("WizardModalCloseObserver"),
+    ));
+
     info!("Registered wizard UI observers");
 }
 

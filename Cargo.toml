@@ -103,6 +103,7 @@ async-graphql = { version = "7.0.17", default-features = false }
 action_items_ecs_clipboard = { path = "./packages/ecs-clipboard" }
 notify-rust = "4.11.7"
 tokio = { version = "1", features = ["full"] }
+bevy-tokio-tasks = "0.16.0"
 reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
 jwalk = "0.8.1"
 rayon = "1"

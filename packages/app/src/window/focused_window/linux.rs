@@ -266,7 +266,7 @@ struct WaylandState {
     toplevels: Vec<ToplevelInfo>,
     output_heads: std::collections::HashMap<String, OutputInfo>, // output_name -> detailed info
     output_name_to_output: std::collections::HashMap<String, wl_output::WlOutput>, /* name -> wl_output mapping */
-    output_geometry: std::collections::HashMap<wl_output::WlOutput, (i32, i32, i32, i32)>, /* output -> (x, y, width, height) - legacy */
+    output_geometry: std::collections::HashMap<wl_output::WlOutput, (i32, i32, i32, i32)>, // Fallback for when output management protocol unavailable
     ready: bool,
 }
 
@@ -342,7 +342,7 @@ impl Dispatch<wl_output::WlOutput, ()> for WaylandQueueState {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        // Legacy wl_output events are handled by output management protocol
+        // wl_output events handled by output management protocol when available
         // This dispatch is required but we don't process these events directly
     }
 }

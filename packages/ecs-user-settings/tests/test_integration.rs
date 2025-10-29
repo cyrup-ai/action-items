@@ -131,9 +131,12 @@ mod integration_tests {
     use std::collections::HashMap;
     use action_items_ecs_surrealdb::DatabaseService;
     
-    use action_items_ecs_user_settings::events::*;
-    use action_items_ecs_user_settings::plugin::UserSettingsPlugin;
-    use action_items_ecs_user_settings::schema::USER_SETTINGS_SCHEMA;
+    use action_items_ecs_user_settings::{
+        SettingsReadRequested, SettingsWriteRequested, SettingsUpdateRequested,
+        SettingsDeleteRequested, SettingsQueryRequested, SettingsReadCompleted,
+        SettingsWriteCompleted, SettingsUpdateCompleted, SettingsDeleteCompleted,
+        SettingsQueryCompleted, SettingChanged, UserSettingsPlugin, USER_SETTINGS_SCHEMA
+    };
 
     /// Helper to create test app with database
     async fn create_test_app() -> App {

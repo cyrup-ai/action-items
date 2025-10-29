@@ -6,6 +6,10 @@
 use bevy::prelude::*;
 use bevy::tasks::futures_lite::future;
 use bevy::tasks::{AsyncComputeTaskPool, block_on};
+#[cfg(target_os = "linux")]
+use bevy::ecs::event::Events;
+#[cfg(target_os = "linux")]
+use bevy_tokio_tasks::TokioTasksRuntime;
 use global_hotkey::hotkey::HotKey;
 use tracing::{debug, error, info, warn};
 
@@ -991,13 +995,14 @@ pub fn process_multi_capture_cancellations_system(
     }
 }
 
-/// Poll Wayland hotkey events and emit HotkeyPressed events
+/// Poll Wayland hotkey events using shared Tokio runtime
 /// 
 /// Uses try_lock() to avoid blocking Bevy's main thread.
-/// Creates ephemeral tokio runtime for async polling.
+/// Spawns background task in shared TokioTasksRuntime instead of creating ephemeral runtime.
 #[cfg(target_os = "linux")]
 pub fn poll_wayland_hotkey_events_system(
     hotkey_manager: Res<HotkeyManager>,
+    tokio_runtime: Res<TokioTasksRuntime>,
     mut hotkey_pressed: EventWriter<HotkeyPressed>,
     hotkey_registry: Res<HotkeyRegistry>,
     config: Res<HotkeyConfig>,
@@ -1007,36 +1012,43 @@ pub fn poll_wayland_hotkey_events_system(
 
         // Try non-blocking lock (returns immediately if busy)
         if let Ok(mut mgr_lock) = mgr.try_lock() {
-            // Create ephemeral runtime for async polling
-            match tokio::runtime::Runtime::new() {
-                Ok(rt) => {
-                    match rt.block_on(mgr_lock.poll_events()) {
-                        Ok(events) => {
-                            for action_id in events {
-                                // Find binding by action ID
-                                if let Some(binding) = hotkey_registry.bindings.iter()
-                                    .find(|b| b.action == action_id)
-                                {
-                                    if config.enable_debug_logging {
-                                        info!("🔥 Wayland hotkey triggered: {}", action_id);
+            let enable_debug_logging = config.enable_debug_logging;
+            
+            // Clone registry for async context
+            let bindings = hotkey_registry.bindings.clone();
+            
+            // ✅ Use shared Tokio runtime instead of creating ephemeral one
+            tokio_runtime.spawn_background_task(|mut ctx| async move {
+                match mgr_lock.poll_events().await {
+                    Ok(events) => {
+                        if !events.is_empty() {
+                            // Send events back to main thread
+                            ctx.run_on_main_thread(move |ctx| {
+                                let mut hotkey_pressed = ctx.world_mut().resource_mut::<Events<HotkeyPressed>>();
+                                
+                                for action_id in events {
+                                    // Find binding by action ID
+                                    if let Some(binding) = bindings.iter()
+                                        .find(|b| b.action == action_id)
+                                    {
+                                        if enable_debug_logging {
+                                            info!("🔥 Wayland hotkey triggered: {}", action_id);
+                                        }
+                                        hotkey_pressed.send(HotkeyPressed {
+                                            binding: binding.clone(),
+                                        });
+                                    } else {
+                                        warn!("Received Wayland event for unknown action: {}", action_id);
                                     }
-                                    hotkey_pressed.write(HotkeyPressed {
-                                        binding: binding.clone(),
-                                    });
-                                } else {
-                                    warn!("Received Wayland event for unknown action: {}", action_id);
                                 }
-                            }
-                        }
-                        Err(e) => {
-                            error!("Failed to poll Wayland hotkey events: {}", e);
+                            }).await;
                         }
                     }
+                    Err(e) => {
+                        error!("Failed to poll Wayland hotkey events: {}", e);
+                    }
                 }
-                Err(e) => {
-                    error!("Failed to create tokio runtime for Wayland polling: {}", e);
-                }
-            }
+            });
         }
         // If try_lock() fails, we skip this frame - no blocking
     }

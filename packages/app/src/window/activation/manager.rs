@@ -81,17 +81,30 @@ fn activate_window_with_handle(
     ))
 }
 
-/// Legacy function for backwards compatibility
+/// Activate window without handle (limited functionality)
+///
+/// This function provides basic window visibility control without platform-specific
+/// activation. It only sets `visible = true` and `set_minimized(false)`.
+///
+/// For full window activation with platform-specific foregrounding (NSApplication on macOS,
+/// SetForegroundWindow on Windows, _NET_ACTIVE_WINDOW on X11, XDG activation on Wayland),
+/// use the `window_activation_system` which calls `activate_window_with_handle`.
+///
+/// **Use this when**: You only need basic visibility control without window targeting.
+///
+/// **Use `window_activation_system` when**: You need true window foregrounding and focus.
 pub fn activate_window(window: &mut Window) {
     warn!(
-        "Using legacy activate_window function - consider migrating to the \
-         window_activation_system"
+        "activate_window called without platform-specific window handle. \
+         Only setting visibility flags. Use window_activation_system for full activation with foregrounding."
     );
 
     window.visible = true;
     window.set_minimized(false);
 
-    debug!("Legacy window activation completed - functionality limited without window handle");
+    debug!(
+        "Window visibility flags set (visible=true, minimized=false). No platform-specific activation performed."
+    );
 }
 
 /// Initialize platform-specific window activation requirements

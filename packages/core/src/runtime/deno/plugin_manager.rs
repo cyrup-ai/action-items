@@ -286,7 +286,7 @@ impl PluginManager {
         })
     }
 
-    /// Load legacy package.json manifest for Raycast compatibility
+    /// Load Raycast-format package.json manifest for compatibility
     fn load_package_json_manifest(
         &self,
         package_json_path: &Path,

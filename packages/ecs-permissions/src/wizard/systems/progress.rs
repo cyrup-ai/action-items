@@ -206,52 +206,53 @@ pub fn update_wizard_progress(
     // Update overall wizard progress if any permissions changed
     if any_status_changed {
         let (completed, total) = tracker.calculate_progress();
-        let wizard_progress = Progress { 
-            done: completed, 
-            total 
+        let wizard_progress = Progress {
+            done: completed,
+            total
         };
-        
+
         monitor.update_visible(tracker.get_wizard_entry(), wizard_progress);
         progress_writer.write(wizard_progress);
-        
+
         info!("Overall wizard progress: {}/{} permissions", completed, total);
-        
-        // Check if we should advance to next state
-        if state_transitions.can_transition() {
-            match wizard_state.get() {
-                WizardState::CheckingPermissions => {
-                    // Advance to requesting permissions once we've checked all
-                    let all_checked = tracker.permission_status_cache.values()
-                        .all(|status| !matches!(status, PermissionStatus::Unknown));
-                    
-                    if all_checked {
-                        step_complete_events.write(WizardStepComplete::new(
-                            WizardState::CheckingPermissions,
-                            WizardState::RequestingPermissions,
-                        ));
-                    }
-                },
-                WizardState::RequestingPermissions => {
-                    // Advance to hotkey setup when all required permissions are granted
-                    if tracker.all_required_permissions_granted() {
-                        step_complete_events.write(WizardStepComplete::new(
-                            WizardState::RequestingPermissions,
-                            WizardState::SettingUpHotkeys,
-                        ));
-                    }
-                },
-                WizardState::SettingUpHotkeys => {
-                    // Auto-advance to complete only if all required permissions granted
-                    // Hotkeys are optional - wizard can complete without them
-                    if tracker.all_required_permissions_granted() {
-                        step_complete_events.write(WizardStepComplete::new(
-                            WizardState::SettingUpHotkeys,
-                            WizardState::Complete,
-                        ));
-                    }
-                },
-                _ => {},
-            }
+    }
+
+    // Check if we should advance to next state (runs on every event, not just when cache changes)
+    // This ensures advancement happens even if duplicate events arrive after the 500ms minimum duration
+    if state_transitions.can_transition() {
+        match wizard_state.get() {
+            WizardState::CheckingPermissions => {
+                // Advance to requesting permissions once we've checked all
+                let all_checked = tracker.permission_status_cache.values()
+                    .all(|status| !matches!(status, PermissionStatus::Unknown));
+
+                if all_checked {
+                    step_complete_events.write(WizardStepComplete::new(
+                        WizardState::CheckingPermissions,
+                        WizardState::RequestingPermissions,
+                    ));
+                }
+            },
+            WizardState::RequestingPermissions => {
+                // Advance to hotkey setup when all required permissions are granted
+                if tracker.all_required_permissions_granted() {
+                    step_complete_events.write(WizardStepComplete::new(
+                        WizardState::RequestingPermissions,
+                        WizardState::SettingUpHotkeys,
+                    ));
+                }
+            },
+            WizardState::SettingUpHotkeys => {
+                // Auto-advance to complete only if all required permissions granted
+                // Hotkeys are optional - wizard can complete without them
+                if tracker.all_required_permissions_granted() {
+                    step_complete_events.write(WizardStepComplete::new(
+                        WizardState::SettingUpHotkeys,
+                        WizardState::Complete,
+                    ));
+                }
+            },
+            _ => {},
         }
     }
 }

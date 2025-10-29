@@ -6,6 +6,7 @@ description = "Bevy ECS cache service wrapping goldylox high-performance cache"
 
 [dependencies]
 bevy = { workspace = true }
+bevy-tokio-tasks = { workspace = true }
 goldylox = { path = "/Volumes/samsung_t9/goldylox" }
 serde = { workspace = true }
 serde_json = { workspace = true }

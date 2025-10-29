@@ -2,8 +2,10 @@ use bevy::ecs::world::CommandQueue;
 use bevy::prelude::*;
 use bevy::tasks::futures_lite::future;
 use bevy::tasks::{AsyncComputeTaskPool, block_on};
+use bevy_tokio_tasks::TokioTasksRuntime;
 use goldylox::prelude::CacheOperationError;
-use tracing::{debug, info, warn};
+use goldylox::Goldylox;
+use tracing::{debug, error, info, warn};
 
 use crate::components::*;
 use crate::events::*;
@@ -13,102 +15,59 @@ use crate::resources::*;
 // Startup Systems
 // ============================================================================
 
-/// Initialize default cache partitions asynchronously
-pub fn initialize_cache_partitions_system(mut commands: Commands) {
-    let task_pool = AsyncComputeTaskPool::get();
-    
-    let task = task_pool.spawn(async move {
-        let mut command_queue = CommandQueue::default();
-        
-        // Create all default partitions
-        let partition_names = vec![
-            "plugin_metadata",
-            "search_results",
-            "ui_assets",
-            "configuration",
-            "api_responses",
-        ];
-        
-        command_queue.push(move |world: &mut World| {
-            let _manager = world.resource_mut::<CacheManager>();
-            let default_config = CachePartitionConfig::default();
-            
-            // Create futures for all partitions
-            let task_pool = AsyncComputeTaskPool::get();
-            let mut tasks = Vec::new();
-            
-            for partition_name in partition_names {
-                let config = default_config.clone();
-                let name = partition_name.to_string();
-                
-                let task = task_pool.spawn(async move {
-                    goldylox::Goldylox::<String, Vec<u8>>::builder()
-                        .hot_tier_max_entries(config.hot_tier_capacity as u32)
-                        .warm_tier_max_entries(config.warm_tier_capacity)
-                        .build()
-                        .await
-                        .map(|cache| (name.clone(), cache, config))
-                        .map_err(|e| format!("Failed to create partition '{}': {:?}", name, e))
-                });
-                
-                tasks.push((partition_name, task));
-            }
-            
-            // Store tasks as components for polling
-            for (name, task) in tasks {
-                world.spawn(CachePartitionInitTask {
-                    partition_name: name.to_string(),
-                    task,
-                });
-            }
-        });
-        
-        command_queue
-    });
-    
-    commands.spawn(PartitionInitTask(task));
-}
-
-/// Component for partition initialization
-#[derive(Component)]
-pub struct CachePartitionInitTask {
-    pub partition_name: String,
-    pub task: bevy::tasks::Task<Result<(String, goldylox::Goldylox<String, Vec<u8>>, CachePartitionConfig), String>>,
-}
-
-/// Poll partition initialization tasks
-pub fn handle_partition_init_tasks(
-    mut commands: Commands,
-    mut cache_manager: ResMut<CacheManager>,
-    mut tasks: Query<(Entity, &mut CachePartitionInitTask)>,
+/// Initialize default cache partitions using shared Tokio runtime
+///
+/// Spawns background tasks in the shared TokioTasksRuntime to initialize goldylox instances.
+/// Once initialized, partitions are inserted into CacheManager on the main thread.
+pub fn initialize_cache_partitions_system(
+    tokio_runtime: Res<TokioTasksRuntime>,
 ) {
-    for (entity, mut task) in &mut tasks {
-        if let Some(result) = block_on(future::poll_once(&mut task.task)) {
-            match result {
-                Ok((name, cache, config)) => {
-                    info!("Initialized cache partition: {}", name);
-                    cache_manager.partitions.insert(name.clone(), cache);
-                    cache_manager.partition_configs.insert(name, config);
+    info!("Initializing default cache partitions using shared Tokio runtime");
+
+    // Create all default partitions
+    let partition_configs = vec![
+        ("plugin_metadata", CachePartitionConfig::default()),
+        ("search_results", CachePartitionConfig::default()),
+        ("ui_assets", CachePartitionConfig::default()),
+        ("configuration", CachePartitionConfig::default()),
+        ("api_responses", CachePartitionConfig::default()),
+    ];
+
+    for (partition_name, config) in partition_configs {
+        let name = partition_name.to_string();
+        info!("Spawning background task to initialize cache partition: {}", name);
+
+        // Spawn background task in shared Tokio runtime
+        tokio_runtime.spawn_background_task(|mut ctx| async move {
+            info!("Building goldylox cache partition '{}' with hot_tier={}, warm_tier={}",
+                  name, config.hot_tier_capacity, config.warm_tier_capacity);
+
+            // Build goldylox cache in Tokio runtime context
+            match Goldylox::<String, Vec<u8>>::builder()
+                .hot_tier_max_entries(config.hot_tier_capacity as u32)
+                .warm_tier_max_entries(config.warm_tier_capacity)
+                .build()
+                .await
+            {
+                Ok(cache) => {
+                    info!("Successfully built cache partition '{}'", name);
+                    let partition_name = name.clone();
+
+                    // Insert into CacheManager on main thread
+                    ctx.run_on_main_thread(move |ctx| {
+                        if let Some(mut cache_manager) = ctx.world.get_resource_mut::<CacheManager>() {
+                            cache_manager.insert_partition(partition_name.clone(), cache, config);
+                            info!("Cache partition '{}' registered in CacheManager", partition_name);
+                        } else {
+                            warn!("CacheManager resource not found when trying to insert partition '{}'", partition_name);
+                        }
+                    }).await;
                 }
                 Err(e) => {
-                    warn!("Failed to initialize partition: {}", e);
+                    error!("Failed to build cache partition '{}': {:?}", name, e);
                 }
             }
-            commands.entity(entity).despawn();
-        }
-    }
-}
-
-/// Poll main initialization task
-pub fn handle_partition_init_system(
-    mut commands: Commands,
-    mut tasks: Query<(Entity, &mut PartitionInitTask)>,
-) {
-    for (entity, mut task) in &mut tasks {
-        if let Some(mut command_queue) = block_on(future::poll_once(&mut task.0)) {
-            commands.append(&mut command_queue);
-            commands.entity(entity).despawn();
-        }
+        });
     }
 }
 
@@ -429,6 +388,7 @@ pub fn cache_metrics_system(
     cache_manager: Res<CacheManager>,
     mut metrics: ResMut<CacheMetrics>,
     time: Res<Time>,
+    mut last_log_time: Local<f32>,
 ) {
     // Update global uptime
     metrics.global_stats.uptime_seconds += time.delta().as_secs();
@@ -442,19 +402,19 @@ pub fn cache_metrics_system(
     for (partition_name, goldylox_cache) in cache_manager.partitions.iter() {
         // Get unified stats from goldylox (atomic, accurate, comprehensive)
         let unified_stats_ref = goldylox_cache.get_unified_stats();
-        
+
         // Compute snapshot of current stats (CRITICAL: use compute_unified_stats, not get_snapshot)
         let unified_stats = unified_stats_ref.compute_unified_stats();
-        
+
         // Convert to CachePartitionStats
         let partition_stats = CachePartitionStats::from_goldylox_stats(&unified_stats);
-        
+
         // Update aggregates
         total_memory += partition_stats.total_size;
         total_entries += partition_stats.entry_count;
         total_hits += partition_stats.hits;
         total_misses += partition_stats.misses;
-        
+
         // Store partition-specific stats
         metrics.partition_stats.insert(partition_name.clone(), partition_stats);
     }
@@ -462,15 +422,16 @@ pub fn cache_metrics_system(
     // Update global aggregated stats
     metrics.global_stats.total_memory_used = total_memory;
     metrics.global_stats.total_entries = total_entries;
-    
+
     // Optional: log summary periodically (every 30 seconds)
-    if metrics.global_stats.uptime_seconds % 30 == 0 {
+    *last_log_time += time.delta_secs();
+    if *last_log_time >= 30.0 {
         let overall_hit_rate = if total_hits + total_misses > 0 {
             total_hits as f64 / (total_hits + total_misses) as f64
         } else {
             0.0
         };
-        
+
         debug!(
             "Cache metrics: partitions={}, hit_rate={:.2}%, memory={}KB, entries={}",
             cache_manager.partitions.len(),
@@ -478,5 +439,7 @@ pub fn cache_metrics_system(
             total_memory / 1024,
             total_entries,
         );
+
+        *last_log_time = 0.0; // Reset timer
     }
 }
