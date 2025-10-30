@@ -4,6 +4,7 @@
 //! adjustments.
 
 use action_items_core::{LauncherEvent, LauncherEventType};
+use action_items_ecs_ui::UiSourceCamera;
 use action_items_ui::{UiState, set_ui_visibility};
 use bevy::prelude::*;
 use bevy::window::{Monitor, MonitorSelection, PrimaryWindow, Window};
@@ -23,8 +24,11 @@ pub fn setup_window_system(
     monitors_query: Query<(Entity, &Monitor)>,
     active_monitor: Res<ActiveMonitor>,
 ) {
-    // Add camera for UI
-    commands.spawn(Camera2d);
+    // Add camera for UI with Lunex source camera for dimension fetching
+    commands.spawn((
+        Camera2d,
+        UiSourceCamera::<0>,
+    ));
 
     // Calculate proportional sprite size using viewport-responsive methods
     let (sprite_width, sprite_height) =

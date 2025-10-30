@@ -1,4 +1,4 @@
-//! UI layout system components and computation for the Lunex UI system
+//! UI layout system components and computation for the Cyrup UI system
 
 use std::any::TypeId;
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ use crate::{
 /// - [`Dimension`] - Set the size of the Ui-Tree
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_lunex::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_cyrup::prelude::*;
 /// # fn spawn_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
 /// commands
 ///     .spawn((
@@ -60,7 +60,7 @@ pub struct UiRoot3d;
 ///
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_lunex::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_cyrup::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
 /// # fn spawn_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
 /// # commands.spawn((
 /// #     UiLayoutRoot::new_2d(),
@@ -88,7 +88,7 @@ impl UiLayout {
     /// bottom-right corner. Nodes with this layout are not included in the ui flow.
     /// ## 🛠️ Example
     /// ```
-    /// # use bevy_lunex::{UiLayout, Rl};
+    /// # use bevy_cyrup::{UiLayout, Rl};
     /// let layout: UiLayout = UiLayout::boundary().pos1(Rl(20.0)).pos2(Rl(80.0)).pack();
     /// ```
     pub fn boundary() -> UiLayoutTypeBoundary {
@@ -98,7 +98,7 @@ impl UiLayout {
     /// Nodes with this layout are not included in the ui flow.
     /// ## 🛠️ Example
     /// ```
-    /// # use bevy_lunex::{UiLayout, Ab, Rl};
+    /// # use bevy_cyrup::{UiLayout, Ab, Rl};
     /// let layout: UiLayout = UiLayout::window().pos(Ab(100.0)).size(Rl(50.0)).pack();
     /// ```
     pub fn window() -> UiLayoutTypeWindow {
@@ -109,7 +109,7 @@ impl UiLayout {
     /// Nodes with this layout are not included in the ui flow.
     /// ## 🛠️ Example
     /// ```
-    /// # use bevy_lunex::UiLayout;
+    /// # use bevy_cyrup::UiLayout;
     /// let layout: UiLayout = UiLayout::solid().size((4.0, 3.0)).align_x(-0.8).pack();
     /// ```
     pub fn solid() -> UiLayoutTypeSolid {

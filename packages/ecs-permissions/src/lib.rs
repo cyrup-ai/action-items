@@ -32,7 +32,7 @@ pub use plugin::{
 };
 pub use traits::PermissionHandler;
 pub use types::{PermissionError, PermissionStatus, PermissionType};
-pub use wizard::PermissionWizardPlugin;
+pub use wizard::{PermissionWizardPlugin, WizardVisibilityEvent};
 
 /// Convenience function to add the permission system to a Bevy app
 pub fn add_permissions(app: &mut App) {

@@ -26,17 +26,17 @@ struct PickingCache {
 // #===============#
 // #=== BACKEND ===#
 
-/// Adds picking support for Lunex.
+/// Adds picking support for Cyrup.
 #[derive(Clone)]
-pub struct UiLunexPickingPlugin;
-impl Plugin for UiLunexPickingPlugin {
+pub struct UiCyrupPickingPlugin;
+impl Plugin for UiCyrupPickingPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PickingCache>().add_systems(
             PreUpdate,
             (
                 system_update_picking_cache,
                 system_mark_picking_cache_dirty,
-                lunex_2d_picking,
+                cyrup_2d_picking,
             )
                 .chain()
                 .in_set(PickSet::Backend),
@@ -44,11 +44,11 @@ impl Plugin for UiLunexPickingPlugin {
     }
 }
 
-/// This component disables the Lunex picking backend for this entity.
+/// This component disables the Cyrup picking backend for this entity.
 /// Use this only if you want to use a different or custom picking
 /// bakckend. To disable picking entirely, use [`Pickable::IGNORE`].
 #[derive(Component)]
-pub struct NoLunexPicking;
+pub struct NoCyrupPicking;
 
 /// System to update the picking cache when dirty
 fn system_update_picking_cache(
@@ -61,7 +61,7 @@ fn system_update_picking_cache(
             Option<&Pickable>,
             &ViewVisibility,
         ),
-        Without<NoLunexPicking>,
+        Without<NoCyrupPicking>,
     >,
 ) {
     if cache.dirty {
@@ -103,7 +103,7 @@ fn system_mark_picking_cache_dirty(
 }
 
 /// Checks if any Dimension entities are under a pointer
-fn lunex_2d_picking(
+fn cyrup_2d_picking(
     pointers: Query<(&PointerId, &PointerLocation)>,
     cameras: Query<(Entity, &Camera, &GlobalTransform, &Projection)>,
     primary_window: Query<Entity, With<PrimaryWindow>>,

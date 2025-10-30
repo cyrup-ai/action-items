@@ -426,8 +426,8 @@ pub fn scrambled_reveal_animation(t: f32, text: &str, buffer: &mut String) {
 
 /// This plugin is used for the main logic.
 #[derive(Debug, Default, Clone)]
-pub struct UiLunexAnimPlugin;
-impl Plugin for UiLunexAnimPlugin {
+pub struct UiCyrupAnimPlugin;
+impl Plugin for UiCyrupAnimPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, TextAnimator::system_2d);
 

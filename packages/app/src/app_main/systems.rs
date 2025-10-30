@@ -8,7 +8,7 @@ use crate::events::handlers::preferences::{
 };
 // Removed custom storage system imports - now using ecs-filesystem service
 use crate::events::{
-    detect_preferences_command, handle_execute_commands,
+    bridge_wizard_visibility_to_window, detect_preferences_command, handle_execute_commands,
     handle_launcher_events, handle_preferences_events, handle_preferences_ui_interactions,
     real_hotkey_capture_system, update_current_query_from_events,
 };
@@ -276,6 +276,7 @@ pub fn add_update_systems(app: &mut App) {
             bridge_preferences_to_settings, /* Bridge system for settings UI
                                              * Storage operations now handled by ecs-filesystem
                                              * service */
+            bridge_wizard_visibility_to_window, // Bridge wizard visibility to window system
             handle_accessibility_permission_changes, // Handle accessibility permission changes
         ),
     );

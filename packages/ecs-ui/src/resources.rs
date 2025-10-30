@@ -1,4 +1,4 @@
-//! UI resource types and event definitions for the Lunex UI system
+//! UI resource types and event definitions for the Cyrup UI system
 
 use std::collections::{HashMap, HashSet};
 
@@ -22,7 +22,7 @@ pub struct LayoutCache {
 /// ## 🛠️ Example
 /// ```
 /// # use bevy_ecs::prelude::*;
-/// # use bevy_lunex::prelude::*;
+/// # use bevy_cyrup::prelude::*;
 /// fn setup(mut commands: Commands) {
 ///     commands.insert_resource(UiTheme {
 ///         default_color: UiColor::from(bevy_color::Color::srgb(0.2, 0.2, 0.8)),
@@ -61,7 +61,7 @@ impl Default for UiTheme {
 /// ## 🛠️ Example
 /// ```
 /// # use bevy_ecs::prelude::*;
-/// # use bevy_lunex::prelude::*;
+/// # use bevy_cyrup::prelude::*;
 /// fn handle_ui_events(mut events: EventReader<UiEvent>) {
 ///     for event in events.read() {
 ///         match event {

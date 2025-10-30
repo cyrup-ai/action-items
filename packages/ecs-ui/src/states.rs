@@ -20,7 +20,7 @@ pub mod prelude {
 /// For more information check the documentation on [`UiState`].
 ///
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_lunex::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_cyrup::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
 ///      UiLayout::new(vec![
 ///          (UiBase::id(), UiLayout::window().full()),
 ///          (UiHover::id(), UiLayout::window().x(Rl(10.0)).full())
@@ -33,7 +33,7 @@ pub mod prelude {
 ///
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_lunex::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_cyrup::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
 /// # fn spawn_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
 /// # commands.spawn((
 /// #     UiLayoutRoot::new_2d(),
@@ -173,7 +173,7 @@ pub fn hover_set<E: Event, const BOOL: bool>(trigger: Trigger<E>, mut commands: 
 ///
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_lunex::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_cyrup::prelude::*;
 /// # fn spawn_ui(mut commands: Commands) {
 /// commands.spawn((
 ///     UiSelected::new().forward_speed(10.0).backward_speed(5.0),
@@ -263,7 +263,7 @@ impl PartialEq for UiSelected {
 ///
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_lunex::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_cyrup::prelude::*;
 /// # fn spawn_ui(mut commands: Commands) {
 /// commands.spawn((
 ///     UiClicked::new().forward_speed(15.0).backward_speed(8.0),
@@ -353,7 +353,7 @@ impl PartialEq for UiClicked {
 ///
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_lunex::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_cyrup::prelude::*;
 /// # fn spawn_ui(mut commands: Commands) {
 /// commands.spawn((
 ///     UiIntro::new().duration(2.0).curve(|t| t * t), /* 2 second quadratic ease
@@ -436,7 +436,7 @@ impl PartialEq for UiIntro {
 ///
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_lunex::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_cyrup::prelude::*;
 /// # fn spawn_ui(mut commands: Commands) {
 /// commands.spawn((
 ///     UiOutro::new()
@@ -712,8 +712,8 @@ fn observer_event_duplicator<E: Event + Copy>(
 }
 
 /// This plugin is used for the main logic.
-pub struct UiLunexStatePlugin;
-impl Plugin for UiLunexStatePlugin {
+pub struct UiCyrupStatePlugin;
+impl Plugin for UiCyrupStatePlugin {
     fn build(&self, app: &mut App) {
         // Add events
         app.add_event::<UiSelectedSet>().add_event::<UiClickedSet>();

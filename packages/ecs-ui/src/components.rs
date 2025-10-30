@@ -1,4 +1,4 @@
-//! Core UI component types for the Lunex UI system
+//! Core UI component types for the Cyrup UI system
 
 use crate::units::UiValue;
 use crate::*;
@@ -14,7 +14,7 @@ impl<T: Into<Vec2>> From<T> for Dimension {
 }
 
 /// **Ui Embedding** - Use this component to mark entities whose texture handles are embeddings
-/// instead of regular assets. This means Lunex will resize the actual texture source when
+/// instead of regular assets. This means Cyrup will resize the actual texture source when
 /// [`Dimension`] has changed.
 #[derive(Component, Reflect, Clone, PartialEq, Debug)]
 pub struct UiEmbedding;
@@ -56,7 +56,7 @@ impl<T: Into<UiValue<Vec2>>> From<T> for UiImageSize {
 ///
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_lunex::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_cyrup::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
 /// # fn spawn_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
 /// # commands.spawn((
 /// #     UiLayoutRoot::new_2d(),

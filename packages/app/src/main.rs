@@ -33,6 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Action Items v{} starting with Bevy LogPlugin + file output", env!("CARGO_PKG_VERSION"));
         info!("Log files are written to ~/.config/action-items/logs/action-items.log");
         info!("Panic stack traces are automatically captured with trace feature enabled");
+        info!("Logging filter includes permission wizard components");
+        info!("Permissions wizard debug_force_show is enabled");
     });
 
     // Add all system schedules

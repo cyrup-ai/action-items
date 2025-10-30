@@ -11,7 +11,7 @@ use crate::{UiClicked, UiHover, UiIntro, UiLayout, UiSelected, UiTextSize, *};
 /// ```
 /// # use bevy_ecs::prelude::*;
 /// # use bevy_asset::prelude::*;
-/// # use bevy_lunex::prelude::*;
+/// # use bevy_cyrup::prelude::*;
 /// fn spawn_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
 ///     // Auto-adds hover, click states and observers
 ///     commands.spawn_ui_button("Click Me", UiLayout::solid().size((200.0, 50.0)).pack());

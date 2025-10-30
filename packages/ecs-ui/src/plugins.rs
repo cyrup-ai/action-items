@@ -1,11 +1,11 @@
-//! Plugin definitions and system sets for the Lunex UI system
+//! Plugin definitions and system sets for the Cyrup UI system
 
 #[cfg(feature = "text3d")]
 use bevy_rich_text3d::{Text3dPlugin, Text3dSet};
 
 use crate::cursor::CursorPlugin;
-use crate::picking::UiLunexPickingPlugin;
-use crate::states::UiLunexStatePlugin;
+use crate::picking::UiCyrupPickingPlugin;
+use crate::states::UiCyrupStatePlugin;
 use crate::*;
 use crate::{
     // Resources
@@ -35,7 +35,7 @@ use crate::{
 #[cfg(feature = "text3d")]
 use crate::{system_text_3d_size_from_dimension, system_text_3d_size_to_layout};
 
-/// System set for [`UiLunexPlugins`]
+/// System set for [`UiCyrupPlugins`]
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum UiSystems {
     /// Systems that modify data pre-computation
@@ -48,16 +48,16 @@ pub enum UiSystems {
 
 /// Gizmo group for UI 2D node debug outlines
 #[derive(GizmoConfigGroup, Default, Reflect, Clone, Debug)]
-pub struct LunexGizmoGroup2d;
+pub struct CyrupGizmoGroup2d;
 
 /// Gizmo group for UI 3D node debug outlines
 #[derive(GizmoConfigGroup, Default, Reflect, Clone, Debug)]
-pub struct LunexGizmoGroup3d;
+pub struct CyrupGizmoGroup3d;
 
 /// This plugin is used for the main logic.
 #[derive(Debug, Default, Clone)]
-pub struct UiLunexPlugin;
-impl Plugin for UiLunexPlugin {
+pub struct UiCyrupPlugin;
+impl Plugin for UiCyrupPlugin {
     fn build(&self, app: &mut App) {
         // Add layout caching resources
         app.init_resource::<DirtyLayout>()
@@ -133,34 +133,34 @@ impl Plugin for UiLunexPlugin {
         // Add index plugins
         app.add_plugins((
             CursorPlugin,
-            UiLunexStatePlugin,
-            UiLunexPickingPlugin,
-            UiLunexIndexPlugin::<0>,
-            UiLunexIndexPlugin::<1>,
-            UiLunexIndexPlugin::<2>,
-            UiLunexIndexPlugin::<3>,
+            UiCyrupStatePlugin,
+            UiCyrupPickingPlugin,
+            UiCyrupIndexPlugin::<0>,
+            UiCyrupIndexPlugin::<1>,
+            UiCyrupIndexPlugin::<2>,
+            UiCyrupIndexPlugin::<3>,
         ));
     }
 }
 
 /// This plugin is used to enable debug functionality.
 #[derive(Debug, Default, Clone)]
-pub struct UiLunexDebugPlugin<const GIZMO_2D_LAYER: usize = 0, const GIZMO_3D_LAYER: usize = 0>;
+pub struct UiCyrupDebugPlugin<const GIZMO_2D_LAYER: usize = 0, const GIZMO_3D_LAYER: usize = 0>;
 impl<const GIZMO_2D_LAYER: usize, const GIZMO_3D_LAYER: usize> Plugin
-    for UiLunexDebugPlugin<GIZMO_2D_LAYER, GIZMO_3D_LAYER>
+    for UiCyrupDebugPlugin<GIZMO_2D_LAYER, GIZMO_3D_LAYER>
 {
     fn build(&self, app: &mut App) {
         // Configure the Gizmo render groups
-        app.init_gizmo_group::<LunexGizmoGroup2d>()
-            .init_gizmo_group::<LunexGizmoGroup3d>()
+        app.init_gizmo_group::<CyrupGizmoGroup2d>()
+            .init_gizmo_group::<CyrupGizmoGroup3d>()
             .add_systems(Startup, |mut config_store: ResMut<GizmoConfigStore>| {
                 // Configure 2D gizmo group with proper Bevy 0.16 patterns
-                let (my_2d_config, _) = config_store.config_mut::<LunexGizmoGroup2d>();
+                let (my_2d_config, _) = config_store.config_mut::<CyrupGizmoGroup2d>();
                 my_2d_config.depth_bias = -0.1; // Render slightly in front
                 my_2d_config.enabled = true;
 
                 // Configure 3D gizmo group with proper Bevy 0.16 patterns
-                let (my_3d_config, _) = config_store.config_mut::<LunexGizmoGroup3d>();
+                let (my_3d_config, _) = config_store.config_mut::<CyrupGizmoGroup3d>();
                 my_3d_config.depth_bias = -0.1; // Render slightly in front
                 my_3d_config.enabled = true;
             });
@@ -181,8 +181,8 @@ impl<const GIZMO_2D_LAYER: usize, const GIZMO_3D_LAYER: usize> Plugin
 
 /// This plugin is used to register index components.
 #[derive(Debug, Default, Clone)]
-pub struct UiLunexIndexPlugin<const INDEX: usize>;
-impl<const INDEX: usize> Plugin for UiLunexIndexPlugin<INDEX> {
+pub struct UiCyrupIndexPlugin<const INDEX: usize>;
+impl<const INDEX: usize> Plugin for UiCyrupIndexPlugin<INDEX> {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
@@ -195,9 +195,9 @@ impl<const INDEX: usize> Plugin for UiLunexIndexPlugin<INDEX> {
     }
 }
 
-/// Plugin group adding all necessary plugins for Lunex
-pub struct UiLunexPlugins;
-impl PluginGroup for UiLunexPlugins {
+/// Plugin group adding all necessary plugins for Cyrup
+pub struct UiCyrupPlugins;
+impl PluginGroup for UiCyrupPlugins {
     fn build(self) -> PluginGroupBuilder {
         let mut builder = PluginGroupBuilder::start::<Self>();
 
@@ -210,10 +210,10 @@ impl PluginGroup for UiLunexPlugins {
             });
         }
 
-        // Add Lunex plugin
+        // Add Cyrup plugin
         builder = builder
-            .add(UiLunexPlugin)
-            .add(crate::textanim::UiLunexAnimPlugin)
+            .add(UiCyrupPlugin)
+            .add(crate::textanim::UiCyrupAnimPlugin)
             .add(crate::responsive::ResponsivePlugin);
 
         // Return the plugin group
@@ -230,7 +230,7 @@ pub fn system_debug_draw_gizmo_2d(
         (&GlobalTransform, &Dimension),
         (Or<(With<UiLayout>, With<UiLayoutRoot>)>, Without<UiRoot3d>),
     >,
-    mut gizmos: Gizmos<LunexGizmoGroup2d>,
+    mut gizmos: Gizmos<CyrupGizmoGroup2d>,
 ) {
     for (transform, dimension) in &query {
         // Draw the gizmo outline
@@ -248,7 +248,7 @@ pub fn system_debug_draw_gizmo_3d(
         (&GlobalTransform, &Dimension),
         (Or<(With<UiLayout>, With<UiLayoutRoot>)>, With<UiRoot3d>),
     >,
-    mut gizmos: Gizmos<LunexGizmoGroup3d>,
+    mut gizmos: Gizmos<CyrupGizmoGroup3d>,
 ) {
     for (transform, dimension) in &query {
         // Draw the gizmo outline

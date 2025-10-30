@@ -128,7 +128,7 @@ pub fn configure_app() -> App {
             .build()
             .set(LogPlugin {
                 level: Level::DEBUG,
-                filter: "wgpu=error,naga=warn,bevy_render=info,bevy_ecs=info".into(),
+                filter: "wgpu=error,naga=warn,bevy_render=info,bevy_ecs=info,action_items_ecs_permissions=debug,ecs_permissions=debug,permissions=debug,wizard=debug".into(),
                 custom_layer: file_logging_layer,
             })
             .set(WindowPlugin {
@@ -187,7 +187,8 @@ pub fn configure_app() -> App {
                 PermissionType::Microphone,     // Required for STT
                 PermissionType::FullDiskAccess, // Required for file management
             ])
-            .with_reason("Action Items requires these permissions to function properly. Accessibility enables global hotkeys, Microphone enables speech-to-text, and Full Disk Access allows file management."), // Permission setup wizard with core permissions ✅
+            .with_reason("Action Items requires these permissions to function properly. Accessibility enables global hotkeys, Microphone enables speech-to-text, and Full Disk Access allows file management.")
+            .with_debug_force_show(true), // Permission setup wizard with core permissions ✅
         // MacosPermissionsPlugin replaced by ECS PermissionPlugin above
         NotificationSystemPlugin, // Enterprise notification system ✅
         HttpPlugin::default(),    // HTTP client service ✅

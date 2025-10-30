@@ -16,6 +16,7 @@ use crate::wizard::{
     WizardProgressIndicator, NavigationAction,
     PermissionCardBundle,
 };
+use crate::wizard::events::WizardVisibilityEvent;
 
 /// Resource containing pre-allocated UI entities for efficient management
 /// 
@@ -55,15 +56,12 @@ pub fn setup_wizard_ui(
     mut commands: Commands,
     _asset_server: Res<AssetServer>,
 ) {
-    // Create root modal entity with wizard root component
+    // Create root modal entity with Lunex layout root
+    // UiLayoutRoot fills the camera viewport via UiFetchFromCamera::<0>
     let modal_root = commands.spawn((
         WizardRoot::new(),
-        UiLayout::window()
-            .size((Vw(80.0), Vh(70.0)))
-            .pos((Vw(50.0), Vh(50.0)))
-            .anchor(Anchor::Center)
-            .pack(),
-        UiColor::from(Color::srgba(0.1, 0.1, 0.15, 0.95)),
+        UiLayoutRoot::new_2d(),
+        UiFetchFromCamera::<0>,  // Auto-sync size from camera
         Visibility::Hidden,
         Name::new("WizardModalRoot"),
     )).id();
@@ -79,11 +77,11 @@ pub fn setup_wizard_ui(
         Name::new("WizardBackdrop"),
     )).id();
     
-    // Create main modal window
+    // Create main modal window - child of UiLayoutRoot, uses viewport units
     let modal_window = commands.spawn((
         UiLayout::window()
-            .size((Rl(95.0), Rl(90.0)))
-            .pos((Rl(50.0), Rl(50.0)))
+            .size((Vw(80.0), Vh(70.0)))  // 80% width, 70% height of viewport
+            .pos((Vw(50.0), Vh(50.0)))   // Centered in viewport
             .anchor(Anchor::Center)
             .pack(),
         UiColor::from(Color::srgba(0.15, 0.15, 0.2, 1.0)),
@@ -239,13 +237,32 @@ pub fn show_wizard_ui(
     mut visibility_query: Query<&mut Visibility>,
     wizard_state: Res<State<WizardState>>,
     mut last_state: Local<Option<WizardState>>,
+    mut wizard_visibility_events: EventWriter<WizardVisibilityEvent>,
 ) {
     let current_state = *wizard_state.get();
-    
+
+    // Debug logging
+    info!("show_wizard_ui called: current_state={:?}, last_state={:?}", current_state, last_state);
+
     // Only update when state changes
     if last_state.map(|s| s != current_state).unwrap_or(true) {
+        debug!("State changed from {:?} to {:?}, updating UI visibility", last_state, current_state);
         // Show/hide backdrop and modal root based on wizard state
         let should_show = current_state.is_active();
+
+        // Trigger launcher window visibility through the wizard visibility event
+        // The app will listen to this event and show/hide the OS window
+        let was_showing = last_state.map(|s| s.is_active()).unwrap_or(false);
+        if should_show != was_showing {
+            let reason = if should_show {
+                format!("Wizard entering active state: {:?}", current_state)
+            } else {
+                "Wizard entering inactive state".to_string()
+            };
+
+            wizard_visibility_events.write(WizardVisibilityEvent::new(should_show, reason));
+            info!("Sent WizardVisibilityEvent: visible={}, state={:?}", should_show, current_state);
+        }
         
         if let Ok(mut backdrop_vis) = visibility_query.get_mut(ui_entities.backdrop) {
             *backdrop_vis = if should_show { Visibility::Visible } else { Visibility::Hidden };

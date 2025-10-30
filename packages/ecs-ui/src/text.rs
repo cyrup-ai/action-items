@@ -1,4 +1,4 @@
-//! Text handling systems for UI elements in the Lunex UI system
+//! Text handling systems for UI elements in the Cyrup UI system
 
 use crate::layouts::UiLayoutType;
 use crate::units::Ab;

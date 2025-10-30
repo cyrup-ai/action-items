@@ -489,3 +489,35 @@ pub struct PermissionSetResponse {
     /// Whether partial progress was saved
     pub progress_saved: bool,
 }
+
+/// Event to control the visibility of the permissions wizard window
+///
+/// This event is sent by the wizard to request the OS window to be shown or hidden.
+/// The app should listen to this event and update the window visibility accordingly.
+#[derive(Event, Debug, Clone)]
+pub struct WizardVisibilityEvent {
+    /// Whether the wizard should be visible
+    pub visible: bool,
+    /// Reason for the visibility change (for logging/debugging)
+    pub reason: String,
+}
+
+impl WizardVisibilityEvent {
+    /// Create a new visibility event
+    pub fn new(visible: bool, reason: impl Into<String>) -> Self {
+        Self {
+            visible,
+            reason: reason.into(),
+        }
+    }
+
+    /// Create a show event
+    pub fn show(reason: impl Into<String>) -> Self {
+        Self::new(true, reason)
+    }
+
+    /// Create a hide event
+    pub fn hide(reason: impl Into<String>) -> Self {
+        Self::new(false, reason)
+    }
+}

@@ -1,4 +1,4 @@
-//! UI color management and styling system for the Lunex UI system
+//! UI color management and styling system for the Cyrup UI system
 
 use std::any::TypeId;
 use std::collections::HashMap;
@@ -17,7 +17,7 @@ use crate::{UiBase, UiState, UiTheme, *};
 ///
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_lunex::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
+/// # use bevy_ecs::prelude::*; use bevy_asset::prelude::*; use bevy_picking::prelude::*; use bevy_color::prelude::*; use bevy_cyrup::prelude::*; use bevy_text::prelude::*; use bevy_sprite::prelude::*; use bevy_color::palettes::basic::*; use bevy_math::prelude::*;
 /// # fn spawn_main_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
 /// # commands.spawn((
 /// #     UiLayoutRoot::new_2d(),

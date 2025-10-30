@@ -68,7 +68,7 @@ impl Rectangle2D {
 /// **Align** - A type used to define alignment in a node layout.
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_lunex::*;
+/// # use bevy_cyrup::*;
 /// let align: Align = Align::START; // -> -1.0
 /// let align: Align = Align(-1.0); // -> -1.0
 /// let align: Align = (-1.0).into(); // -> -1.0
@@ -93,7 +93,7 @@ impl From<f32> for Align {
 /// **Scaling** - A type used to define how should a Solid node layout scale relative to a parent.
 /// ## 🛠️ Example
 /// ```
-/// # use bevy_lunex::*;
+/// # use bevy_cyrup::*;
 /// let scaling: Scaling = Scaling::HorFill; // -> always cover the horizontal axis
 /// let scaling: Scaling = Scaling::VerFill; // -> always cover the vertical axis
 /// let scaling: Scaling = Scaling::Fit; // -> always fit inside

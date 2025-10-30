@@ -2,7 +2,7 @@
 #![allow(clippy::type_complexity)]
 #![recursion_limit = "256"]
 
-//! Lunex UI system decomposed into focused modules for maintainability
+//! Cyrup UI system decomposed into focused modules for maintainability
 //!
 //! This library provides a comprehensive UI system built on Bevy ECS patterns.
 //! The implementation is organized into specialized modules:
@@ -211,7 +211,7 @@ pub mod prelude {
     pub use bevy_rich_text3d::*;
 
     // Debug plugins
-    pub use crate::UiLunexDebugPlugin;
+    pub use crate::UiCyrupDebugPlugin;
     // Import other module preludes
     pub use crate::cursor::prelude::*;
     pub use crate::layouts::prelude::*;
@@ -313,5 +313,5 @@ pub mod prelude {
 
         UiThemeChanged,
     };
-    pub use crate::{UiLunexPlugins, UiSystems};
+    pub use crate::{UiCyrupPlugins, UiSystems};
 }

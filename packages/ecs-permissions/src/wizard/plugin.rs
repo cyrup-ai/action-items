@@ -16,7 +16,7 @@ use crate::wizard::{
     WizardStartRequest, WizardStepComplete, WizardPermissionStatusChanged,
     WizardPermissionRequest, WizardBatchPermissionCheck, WizardPermissionCheckComplete,
     WizardCancelRequest, WizardNavigationRequest, WizardCompleteEvent,
-    PermissionSetResponse,
+    WizardVisibilityEvent, PermissionSetResponse,
     // Components and Resources
     WizardProgressTracker, FirstRunDetector,
     // Systems
@@ -212,6 +212,7 @@ impl Plugin for PermissionWizardPlugin {
            .add_event::<WizardCancelRequest>()
            .add_event::<WizardNavigationRequest>()
            .add_event::<WizardCompleteEvent>()
+           .add_event::<WizardVisibilityEvent>()
            .add_event::<ThemePresetChangeEvent>()
            .add_event::<PermissionSetResponse>();
         

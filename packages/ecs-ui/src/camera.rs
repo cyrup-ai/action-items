@@ -1,4 +1,4 @@
-//! Camera integration systems for UI layout dimensions in the Lunex UI system
+//! Camera integration systems for UI layout dimensions in the Cyrup UI system
 
 use crate::{Dimension, UiFetchFromCamera, UiLayoutRoot, UiSourceCamera, *};
 
