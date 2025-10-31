@@ -65,7 +65,7 @@ impl Plugin for LauncherUiPlugin {
             .add_plugins(PerformancePlugin)
             // Add gradient system plugin from ecs-ui
             .add_plugins(GradientPlugin)
-            // Note: ResponsivePlugin is added by UiLunexPlugins group, not here
+            // Note: ResponsivePlugin is added by UiCyrupPlugins group, not here
             // Add visibility animation plugin from ecs-ui
             .add_plugins(VisibilityPlugin)
             // Add accessibility plugin from ecs-ui

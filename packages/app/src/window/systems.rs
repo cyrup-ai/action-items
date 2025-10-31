@@ -24,7 +24,7 @@ pub fn setup_window_system(
     monitors_query: Query<(Entity, &Monitor)>,
     active_monitor: Res<ActiveMonitor>,
 ) {
-    // Add camera for UI with Lunex source camera for dimension fetching
+    // Add camera for UI with Cyrup source camera for dimension fetching
     commands.spawn((
         Camera2d,
         UiSourceCamera::<0>,

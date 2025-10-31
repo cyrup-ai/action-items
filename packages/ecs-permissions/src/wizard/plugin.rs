@@ -196,7 +196,7 @@ impl PermissionWizardPlugin {
 
 impl Plugin for PermissionWizardPlugin {
     fn build(&self, app: &mut App) {
-        // Note: UiLunexPlugins should be added by the main app, not here
+        // Note: UiCyrupPlugins should be added by the main app, not here
         // This plugin assumes UI system is already initialized
 
         // Initialize wizard state machine

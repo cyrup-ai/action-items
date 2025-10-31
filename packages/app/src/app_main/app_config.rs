@@ -10,7 +10,7 @@ use action_items_ecs_preferences::{PreferencesPlugin, PreferencesUIPlugin};
 use action_items_ecs_search_aggregator::SearchAggregatorPlugin;
 use action_items_ecs_fetch::HttpPlugin;
 use action_items_ecs_progress::ProgressPlugin;
-use action_items_ecs_ui::UiLunexPlugins; // UI system coordination - ENABLED ✅
+use action_items_ecs_ui::UiCyrupPlugins; // UI system coordination - ENABLED ✅
 // Note: UI prelude will be used when app configuration UI is implemented
 use action_items_ui::{LauncherUiPlugin, MonitorConstraintsPlugin, UiVisibilityEvent};
 use bevy::prelude::*;
@@ -174,7 +174,7 @@ pub fn configure_app() -> App {
         SearchAggregatorPlugin, // Search coordination across plugins ✅
     ))
     // UI system must be added BEFORE plugins that depend on it
-    .add_plugins(UiLunexPlugins)  // UI service coordination - ENABLED ✅
+    .add_plugins(UiCyrupPlugins)  // UI service coordination - ENABLED ✅
     // ECS Service ecosystem - Core services
     .add_plugins((
         BluetoothPlugin,              // Cross-platform Bluetooth operations ✅

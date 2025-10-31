@@ -56,7 +56,7 @@ pub fn setup_wizard_ui(
     mut commands: Commands,
     _asset_server: Res<AssetServer>,
 ) {
-    // Create root modal entity with Lunex layout root
+    // Create root modal entity with Cyrup layout root
     // UiLayoutRoot fills the camera viewport via UiFetchFromCamera::<0>
     let modal_root = commands.spawn((
         WizardRoot::new(),
@@ -73,6 +73,7 @@ pub fn setup_wizard_ui(
             .pos((Vw(0.0), Vh(0.0)))
             .pack(),
         UiColor::from(Color::srgba(0.0, 0.0, 0.0, 0.5)),
+        Sprite::default(),
         Visibility::Hidden,
         Name::new("WizardBackdrop"),
     )).id();
@@ -85,6 +86,7 @@ pub fn setup_wizard_ui(
             .anchor(Anchor::Center)
             .pack(),
         UiColor::from(Color::srgba(0.15, 0.15, 0.2, 1.0)),
+        Sprite::default(),
         Visibility::Visible,
         Name::new("WizardModalWindow"),
     )).id();
@@ -108,6 +110,7 @@ pub fn setup_wizard_ui(
                 .anchor(Anchor::Center)
                 .pack(),
             UiColor::from(Color::srgba(0.2, 0.2, 0.25, 1.0)),
+            Sprite::default(),
             Visibility::Hidden,
             Name::new(format!("WizardPanel_{:?}", state)),
         )).id();
@@ -134,6 +137,7 @@ pub fn setup_wizard_ui(
                 .pos((Rl(10.0), Rl(30.0)))
                 .pack(),
             UiColor::from(Color::srgba(0.25, 0.25, 0.3, 1.0)),
+            Sprite::default(),
             Interaction::None,
             Visibility::Hidden,
         )).id();
@@ -159,6 +163,7 @@ pub fn setup_wizard_ui(
                 .anchor(Anchor::BottomCenter)
                 .pack(),
             UiColor::from(Color::srgba(0.3, 0.5, 0.8, 1.0)),
+            Sprite::default(),
             Text::new(action.description()),
             Interaction::None,
             Visibility::Hidden,
@@ -176,6 +181,7 @@ pub fn setup_wizard_ui(
             .anchor(Anchor::TopCenter)
             .pack(),
         UiColor::from(Color::srgba(0.2, 0.4, 0.6, 1.0)),
+        Sprite::default(),
         Text::new("Step 0 of 4"),
         Visibility::Hidden,
         Name::new("WizardProgressIndicator"),
@@ -189,6 +195,7 @@ pub fn setup_wizard_ui(
             .anchor(Anchor::Center)
             .pack(),
         UiColor::from(Color::srgba(0.15, 0.15, 0.2, 0.8)),
+        Sprite::default(),
         Text::new("Ready to begin setup"),
         Visibility::Hidden,
         Name::new("WizardStatusDisplay"),
